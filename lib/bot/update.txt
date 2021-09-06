@@ -1,0 +1,9 @@
+Version 1.0.0
+
+Der Bot hat nun das ELO und Rangsystem integriert. Die Datenbank des Bots ist einsatzbereit und benutzbar.
+Die Befehle des Bots können mit Hilfe des Befehls ``>help`` angezeigt werden. 
+Wenn der Befehl ``>help`` mit dem Namen eines anderen Befehls ausgeführt wird, dann wird noch mehr Infos zu dem Befehl ausgegeben.
+
+Bei jeglichen Fragen und Anregungen gerne an den Entwickler wenden.
+
+MfG Der Entwickler <@312644293602836482>

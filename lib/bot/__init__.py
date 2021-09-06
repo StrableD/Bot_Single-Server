@@ -7,12 +7,11 @@ from apscheduler.triggers.cron import CronTrigger
 from discord import Guild, Intents
 from discord.channel import DMChannel
 from discord.ext.commands import Bot, Context
-from discord.ext.commands.core import Command, command
 from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
 from discord.message import Message
 from lib.bot.constants import BOTPATH, COGS, TOKEN, NoPerms
-from lib.db.db import autosave, getChannel
+from lib.db.db import autosave, getChannelID
 from eventemitter import EventEmitter  # type: ignore
 
 IGNORE_EXCEPTIONS = (CommandNotFound, NoPerms)
@@ -64,7 +63,7 @@ class My_Bot(Bot):
         print("setup complete")
 
     async def printUpdateTxt(self, updateTxt: str):
-        await self.guild.get_channel(getChannel("bot_channel")).send(
+        await self.guild.get_channel(getChannelID("bot_channel")).send(
             updateTxt, allowed_mentions=AllowedMentions.all()
         )
 
@@ -99,7 +98,7 @@ class My_Bot(Bot):
 
     async def process_ghostvoices(self, messsage: Message):
         if self.ghostvoices:
-            channel = self.get_channel(getChannel("ghostvoices"))
+            channel = self.get_channel(getChannelID("ghostvoices"))
             msg = f"Von {messsage.author.display_name}: \n"
             msg += f'"{messsage.content}"'
             await channel.send(msg) if channel != None else await self.get_user(

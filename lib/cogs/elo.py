@@ -1,7 +1,6 @@
 from numpy import average, e
 from lib.bot.constants import BONI, NoPerms, getCurrentGameCadre
 from lib.db.db import (
-    getChannel,
     getData,
     getElo,
     getLeagues,

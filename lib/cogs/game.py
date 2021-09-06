@@ -14,7 +14,7 @@ from lib.bot.constants import (
     setCurrentGameCadre,
 )
 from lib.cogs.settings import takeSurvey
-from lib.db.db import getChannel, getElo, getRole, getRoleTeam
+from lib.db.db import getChannelID, getElo, getRoleID 
 from numpy.random import randint
 
 
@@ -67,12 +67,12 @@ class Game(Cog):
 
     @staticmethod
     def checkRolePos(role: Role, guild: Guild):
-        if role.position >= guild.get_role(getRole("dead")).position:
+        if role.position >= guild.get_role(getRoleID("dead")).position:
             return True
         return False
 
     @command(name="start", aliases=["go", "starten"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def startGame(self, ctx: Context):
         """
         Die Funktion startet das Spiel.
@@ -88,7 +88,7 @@ class Game(Cog):
         playerList = []
         numGamemaster = 0
         for member in ctx.author.voice.channel.members:
-            if any(getRole("gamemaster") == role.id for role in member.roles):
+            if any(getRoleID("gamemaster") == role.id for role in member.roles):
                 numGamemaster += 1
                 if numGamemaster > 2:
                     await ctx.send(
@@ -149,12 +149,12 @@ class Game(Cog):
             for name, value, inline in fields:
                 embed.add_field(name=name, value=value, inline=inline)
             await ctx.send(embed=embed)
-            GVoiceChannel = self.bot.get_channel(getChannel("GameVoiceChannel"))
+            GVoiceChannel = self.bot.get_channel(getChannelID("GameVoiceChannel"))
             for player, gamerole in squad.items():
                 for role in player.roles:
                     if self.checkRolePos(role, ctx.guild):
                         await player.remove_roles(role)
-                await player.add_roles(ctx.guild.get_role(getRole(gamerole)))
+                await player.add_roles(ctx.guild.get_role(getRoleID(gamerole)))
                 await player.move_to(GVoiceChannel)
             await ctx.author.move_to(GVoiceChannel)
             await ctx.send(
@@ -164,7 +164,7 @@ class Game(Cog):
             self._currentgamemaster = ctx.author
 
     @command(name="dead", aliases=["tot"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def setDead(self, ctx: Context, player: Optional[Member]):
         """
         Der gegebene Spieler wird 'getötet'.
@@ -189,7 +189,7 @@ class Game(Cog):
         for role in player.roles:
             if self.checkRolePos(role, ctx.guild) and role.id != 768494431136645127:
                 await player.remove_roles(role)
-        await player.add_roles(ctx.guild.get_role(getRole("dead")))
+        await player.add_roles(ctx.guild.get_role(getRoleID("dead")))
         gameCadre[player]["dead"] = True
         setCurrentGameCadre(gameCadre)
         embed = Embed(
@@ -203,7 +203,7 @@ class Game(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     @command(name="captain", aliases=["hauptmann", "cp"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def setCaptain(self, ctx: Context, player: Optional[Member]):
         """
         Der gegebene Spieler wird die Rolle 'Hauptmann' gegeben.
@@ -224,7 +224,7 @@ class Game(Cog):
                 ctx, "Welchen Spieler willst du zum Hauptmann machen?", livingPlayers
             )
             player = livingPlayers[playerNum]
-        await player.add_roles(ctx.guild.get_role(getRole("captain")))
+        await player.add_roles(ctx.guild.get_role(getRoleID("captain")))
         gameCadre[player]["captain"] = True
         setCurrentGameCadre(gameCadre)
         embed = Embed(
@@ -238,7 +238,7 @@ class Game(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     @command(name="chronicle", aliases=["chronik", "writeChronicle", "wrCr"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def writeChronicle(self, ctx: Context, maxPlayers: Optional[int] = 20):
         """
         Die Chronik für dieses Spiel wird in den zugehörigen Kanal geschrieben.
@@ -271,7 +271,7 @@ class Game(Cog):
             resultCadre[player.display_name] = value
         winner = "Niemand"
         if any(lovebirds := filter(lambda n: n[1]["lovebirds"], gameCadre.items())):
-            teams = [getRoleTeam(value["role"]) for value in lovebirds.values()]
+            teams = [getRoleIDTeam(value["role"]) for value in lovebirds.values()]
             if not teams.count(2):
                 winner = "Liebespaar"
         else:
@@ -279,7 +279,7 @@ class Game(Cog):
             for value in gameCadre.values():
                 role, dead, captain, lovebirds = value.values()
                 if not dead and not lovebirds:
-                    livingTeams.add(getRoleTeam(role))
+                    livingTeams.add(getRoleIDTeam(role))
                 elif not dead and lovebirds:
                     livingTeams.add("Liebespaar")
             if "Jason" in livingTeams:
@@ -318,7 +318,7 @@ class Game(Cog):
             else "Nein",
             winner=winner,
         )
-        await ctx.guild.get_channel(getChannel("chronicle")).send(msg)
+        await ctx.guild.get_channel(getChannelID("chronicle")).send(msg)
         self.bot.emitter.emit("calcElo", winner)
         self.bot._current_gamemaster = None
         self.bot._lastRound = date.today()
@@ -326,7 +326,7 @@ class Game(Cog):
         setCurrentGameCadre({})
 
     @command(name="next", aliases=["moveon", "weiter"], enabled=False, hidden=True)
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def nextMove(self, ctx: Context):
         """
         Der Zug ist abgeschlossen und der nächste Zug kommt dran.
@@ -336,7 +336,7 @@ class Game(Cog):
         pass
 
     @command(name="love", aliases=["liebe", "liebende"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def setLovebirds(self, ctx: Context, player1: Member, player2: Member):
         """
         Die beiden gegebenen Spieler werden das Liebespaar.
@@ -344,7 +344,7 @@ class Game(Cog):
         ``player1``: Der eine Spieler des Liebespaars
         ``player2``: Der andere Spieler des Liebespaars
         """
-        loveChannel = ctx.guild.get_channel(getChannel("lovebirds"))
+        loveChannel = ctx.guild.get_channel(getChannelID("lovebirds"))
         gameCadre = getCurrentGameCadre()
         await loveChannel.set_permissions(
             player1, send_messages=True, read_messages=True, read_message_history=True
@@ -367,13 +367,13 @@ class Game(Cog):
         )
 
     @command(name="removeLove", aliases=["minusLove", "entferneLiebe", "rmLv"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def removeLovebirds(self, ctx: Context):
         """
         Das Liebespaar wird aufgelöst.
         Der Zugang zum Liebespaar-Kanal wird für die Beiden wieder entfernt.
         """
-        loveChannel = ctx.guild.get_channel(getChannel("lovebirds"))
+        loveChannel = ctx.guild.get_channel(getChannelID("lovebirds"))
         gameCadre = getCurrentGameCadre()
         removedPlayer = []
         for member in filter(
@@ -393,7 +393,7 @@ class Game(Cog):
         )
 
     @command(name="ghostvoices", aliases=["geisterstimmen", "gv", "gs"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def setGhostvoices(self, ctx: Context):
         """
         Schaltet die Geiterstimmen frei.

@@ -2,7 +2,6 @@
 Gibt Zugriff auf die Konstanten für den Bot.
 """
 
-from datetime import date
 from json import load
 import json
 from os import chmod, scandir

@@ -1,4 +1,3 @@
-from typing import List
 from lib.bot import My_Bot
 from pathlib import Path
 

@@ -97,8 +97,10 @@ def getLeagues():
     league_dict = {}
     for row in cursor.execute("SELECT * FROM leagues;"):
         league_dict[row[0]] = (row[1] if row[1] != None else 0, row[2] if row[2] != None else 10000)
-    print(league_dict)
     return league_dict
+
+def resetSeason():
+    cursor.execute("UPDATE players SET PlayedGamesSeason = 0, WonGamesSeason = 0, Elo = 1300;")
 
 def updateMembers(members: list[Member]):
     for member in members:

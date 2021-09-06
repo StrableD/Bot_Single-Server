@@ -1,6 +1,7 @@
 from datetime import date
+from discord.ext.commands.core import has_role
 from discord.ext.commands.errors import CheckFailure
-from lib.db.db import getChannelID
+from lib.db.db import getChannelID, getRoleID, resetSeason
 from typing import Optional, get_args
 
 from discord import Colour, Embed, User
@@ -50,7 +51,7 @@ class HelpMenu(ListPageSource):
         embed = Embed(
             title="Hilfe",
             description="Wilkommen bei der Hilfeseite vom Erzähler-Bot!",
-            colour=Colour.random(),
+            colour=Colour.from_rgb(87, 204, 47),
         )
         embed.set_thumbnail(url=self.ctx.guild.me.avatar_url)
         embed.set_footer(
@@ -80,7 +81,7 @@ class Help(Cog):
         embed = Embed(
             title=f"Hilfe mit `{command}`",
             description=syntax(command),
-            colour=Colour.random(),
+            colour=Colour.from_rgb(87, 204, 47),
         )
         embed.add_field(name="Bescheibung des Befehls", value=command.help)
         await ctx.send(embed=embed, delete_after=20.0)
@@ -160,9 +161,13 @@ class Help(Cog):
             await ctx.message.delete()
 
     @command(name="newseason", aliases=["season"])
-    @check(is_guild_owner)
+    #@check(is_guild_owner)
+    @has_role(getRoleID("gamemaster"))
     async def invitePlayer(self, ctx: Context):
         self.bot._season_date = date.today()
+        resetSeason()
+        await ctx.send("""__Die Saison wurde beendet und eine neue angefangen.__\n\nDie gespielten Spiele und die Elo wurden zurückgesetzt""")
+        await ctx.message.delete()
 
     @Cog.listener()
     async def on_ready(self):

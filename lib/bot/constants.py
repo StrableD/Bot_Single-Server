@@ -49,7 +49,6 @@ class MyRoleConverter(RoleConverter):
             for row in MYDB.execute("SELECT name_bot, synonyms FROM roles"):
                 synonymList = [row[0]]
                 if row[1] != None: synonymList.extend(json.loads(row[1]))
-                print(synonymList)
                 if str(argument).lower() in synonymList:
                     roleID = MYDB.execute(
                         "SELECT id FROM roles WHERE name_bot = ?", (synonymList[0],)

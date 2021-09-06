@@ -107,7 +107,7 @@ class Game(Cog):
             embed = Embed(
                 title="Kein Spielstart möglich",
                 desciption="Für ein Spiel benötigt ihr noch mehr Spieler in dem Kanal.",
-                colour=Colour.random(),
+                colour=Colour.from_rgb(255,0,0),
             )
             embed.add_field(
                 name="Anzahl fehlender Spieler",
@@ -124,7 +124,7 @@ class Game(Cog):
             embed = Embed(
                 title="Kein Spielstart möglich",
                 desciption="Für ein Spiel habt ihr zu viele Spieler in dem Kanal.",
-                colour=Colour.random(),
+                colour=Colour.from_rgb(255,0,0),
             )
             embed.add_field(
                 name="Anzahl überzähliger Spieler",
@@ -144,7 +144,7 @@ class Game(Cog):
             )
             squad = self.getSquad(playerList)
             embed = Embed(
-                title="Kaderaufstellung", colour=Colour.random(), type="article"
+                title="Kaderaufstellung", colour=Colour.from_rgb(192, 192, 192), type="article"
             )
 
             fields = []
@@ -200,7 +200,7 @@ class Game(Cog):
         embed = Embed(
             title="Erfolgreich getötet!",
             description=f"Der Spieler {player.name} wurde getötet.",
-            colour=Colour.random(),
+            colour=Colour.from_rgb(0,0,0),
         )
         embed.add_field(
             name="Rollen", value="\n".join(role.name for role in player.roles)
@@ -235,7 +235,7 @@ class Game(Cog):
         embed = Embed(
             title="Erfolgreich zum Hauptmann befördert!",
             description=f"Der Spieler {player.display_name} wurde zum Hauptmann ernannt.",
-            colour=Colour.random(),
+            colour=Colour.orange(),
         )
         embed.add_field(
             name="Rollen", value="\n".join(role.name for role in player.roles)
@@ -257,7 +257,7 @@ class Game(Cog):
                 embed=Embed(
                     title="Spielfehler!",
                     description="Ihr müsst zuerst ein Spiel spielen!",
-                    colour=Colour.random(),
+                    colour=Colour.from_rgb(255,0,0),
                 ),
                 delete_after=60.0,
             )
@@ -364,7 +364,7 @@ class Game(Cog):
             embed=Embed(
                 title="Liebespaar",
                 description="Das Liebespaar wurde gesetzt",
-                colour=Colour.random(),
+                colour=Colour.from_rgb(252,15,192),
             ).add_field(
                 name="Spieler:", value=f"{player1.display_name}\n{player2.display_name}"
             ),
@@ -391,8 +391,8 @@ class Game(Cog):
         await ctx.send(
             embed=Embed(
                 title="Liebespaar",
-                description="Das Liebespaar wurde gesetzt",
-                colour=Colour.random(),
+                description="Das Liebespaar wurde entfernt",
+                colour=Colour.from_rgb(255,0,120),
             ).add_field(name="Spieler:", value="\n".join(removedPlayer)),
             delete_after=60.0,
         )

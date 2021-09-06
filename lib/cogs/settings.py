@@ -35,7 +35,7 @@ async def updateEmojis(guild: Guild, emojis: list[int]):
 
 
 async def takeSurvey(ctx: Context, theme: str, content: list[tuple]):
-    embed = Embed(title="Bitte auswählen", description=theme, color=Colour.random())
+    embed = Embed(title="Bitte auswählen", description=theme, color=Colour.from_rgb(12, 190, 220))
     emojiNums = []
     for name, value in content:
         if value.isdigit():
@@ -69,6 +69,7 @@ async def takeSurvey(ctx: Context, theme: str, content: list[tuple]):
                 return number
     else:
         reaction = str(reaction.emoji.name).strip("keycap_")
+        print(reaction)
         return w2n.word_to_num(reaction)
 
 
@@ -131,7 +132,7 @@ class Settings(Cog):
         setDefaultCadre(squadDict)
 
         await ctx.message.delete()
-        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.random())
+        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192,192,192))
         value = ""
         for role, num in squadDict.items():
             value += f"{str(role).title()}: {num}\n"
@@ -162,7 +163,7 @@ class Settings(Cog):
         setPlayingCadre(squadDict)
 
         await ctx.message.delete()
-        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.random())
+        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192,192,192))
         value = ""
         for role, num in squadDict.items():
             value += f"{str(role).title()}: {num}\n"
@@ -172,6 +173,7 @@ class Settings(Cog):
 
     # last stand with lukas
     @command(name="fill", aliases=["hinzufügen", "add"])
+    @has_role(getRoleID("gamemaster"))
     async def addCitizen(self, ctx: Context):
         """
         Zu dem aktuellen Spielekader wird ein Dorfbewohner hinzugefügt.
@@ -187,6 +189,7 @@ class Settings(Cog):
         await self.returnCadre(ctx)
 
     @command(name="minus", aliases=["entfernen", "sub"])
+    @has_role(getRoleID("gamemaster"))
     async def removeCitizen(self, ctx: Context):
         """
         Von dem aktuellen Kader wird ein Dorfbewohner entfernt.
@@ -215,7 +218,7 @@ class Settings(Cog):
         Gibt den aktuellen Kader zurück.
         """
         cadre = getCadre()
-        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.random())
+        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192,192,192))
         value = ""
         for role, num in cadre.items():
             value += f"{str(role).title()}: {num}\n"
@@ -225,6 +228,7 @@ class Settings(Cog):
         await ctx.message.delete()
     
     @command(name="setRole", aliases=["gibRolle", "role"])
+    @has_role(getRoleID("gamemaster"))
     async def setPlayerRole(self, ctx: Context, player: Member, role: MyRoleConverter):
         await player.add_roles(role)
         await ctx.send(embed = Embed(

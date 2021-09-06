@@ -103,6 +103,16 @@ class Help(Cog):
                     if (not any(map(lambda f: f == is_guild_owner, cmd.checks))
                         and not cmd.hidden and cmd.enabled):
                         commands.append(cmd)
+            def filter(arg):
+                if arg.cog_name == "Game":
+                    return 1
+                elif arg.cog_name == "Settings":
+                    return 2
+                elif arg.cog_name == "Elo":
+                    return 3
+                else:
+                    return 4
+            commands.sort(key=filter)
             menu = MenuPages(
                 source=HelpMenu(ctx, commands),
                 clear_reactions_after=True,

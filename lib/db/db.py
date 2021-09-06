@@ -37,22 +37,20 @@ def autosave(sched: AsyncIOScheduler):
 
 
 # holt sich die angeforderte infos
-def getData(table: str, coulums: tuple[str], key: tuple[str]):
-    cmd = r"SELECT {columns} FROM {table} WHERE {key}"
-    cmd = cmd.format(coulums=coulums, table=table, key= "=".join(key))
+def getData(table: str, columns: tuple[str], key: tuple[str]):
+    cmd = f"SELECT {columns} FROM {table} WHERE {'='.join(key)};"
     cursor.execute(cmd)
     return cursor.fetchall()
-
 
 # setzt die gegebenen infos in der tabelle
 def setData(table: str, colums: tuple(str), values: tuple(str), condition: str = None):
     try:
         if not condition:
-            cmd = f"INSERT INTO {table} {colums} VALUES {values}"
+            cmd = f"INSERT INTO {table} {colums} VALUES {values};"
             cursor.execute(cmd)
         else:
             concated = map(lambda x,y: x+"="+y, zip(colums, values))
-            cmd = f"UPDATE {table} SET ({','.join(concated)}) WHERE {condition}"
+            cmd = f"UPDATE {table} SET ({','.join(concated)}) WHERE {condition};"
             cursor.execute(cmd)
     except:
         return False
@@ -63,34 +61,40 @@ def getChannelID(bot_name: str):
     data = getData("channels", ("id"), ("name_bot", bot_name))
     if len(data) != 1:
         raise DatabaseError
-    elif not data[0] or not data[0].isdecimal():
+    elif not data[0] or type(data[0]) != int:
         raise DataError
     else:
-        return int(data[0])
+        return data[0]
 
 def getRoleID(bot_name: str):
     data = getData("roles", ("id"), ("name_bot", bot_name))
     if len(data) != 1:
         raise DatabaseError
-    elif not data[0] or not data[0].isdecimal():
+    elif not data[0] or type(data[0]) != int:
         raise DataError
     else:
-        return int(data[0])
+        return data[0]
 
 def getRoleTeam(bot_name: str):
     data = getData("roles", ("team"), ("name_bot", bot_name))
     if len(data) != 1:
         raise DatabaseError
-    elif not data[0] or not data[0].isdecimal():
+    elif not data[0] or type(data[0]) != str:
         raise DataError
     else:
-        return str(data[0])
+        return data[0]
 
 def getElo(player_id: int):
     data = getData("players", ("Elo"), ("PlayerID", player_id))
     if len(data) != 1:
         raise DatabaseError
-    elif not data[0] or not data[0].isdecimal():
+    elif not data[0] or type(data[0]) != int:
         raise DataError
     else:
-        return int(data[0])
+        return data[0]
+
+def getLeagues():
+    league_dict = {}
+    for row in cursor.execute("SELECT * FROM leagues;"):
+        league_dict[row[0]] = (row[1] if not row[1] else 0, row[2] if not row[2] else 10000)
+    return league_dict

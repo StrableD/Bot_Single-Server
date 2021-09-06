@@ -1,13 +1,11 @@
 from numpy import average, e
 from lib.bot.constants import BONI, NoPerms, getCurrentGameCadre
 from lib.db.db import (
-    getData,
     getElo,
-    getLeagues,
-    getRole,
+    getRoleID,
     getRoleTeam,
-    setElo,
-    setPlayedGames,
+    getData,
+    getLeagues
 )
 from random import choice
 from discord import Embed, Member
@@ -40,7 +38,7 @@ class Elo(Cog):
             )
             await ctx.send(embed=embed, delete_after=45.0)
         elif players != [] and not any(
-            role.id == getRole("gamemaster") for role in ctx.author.roles
+            role.id == getRoleID("gamemaster") for role in ctx.author.roles
         ):
             raise NoPerms(["Adminrechte"])
         elif players != [] and all(
@@ -165,7 +163,7 @@ class Elo(Cog):
         return self.eloDiff(myElo, enemyElo, result)
 
     def getRanked(self, player: Member):
-        playedGames = getData("PlayedGamesSeason", "players", ("PlayerId", player.id))
+        playedGames = int(getData("players", ("PlayedGamesSeason"),("PlayerId", player.id)))
         if playedGames < 10:
             pass
         elif playedGames == 10:
@@ -184,19 +182,9 @@ class Elo(Cog):
             team = values["team"]
             role = values["role"]
             setPlayedGames(player.id)
-            if (
-                values["elo"] != None
-                and getData("PlayedGamesSeason", "players", ("PlayerId", player.id))
-                < 10
-            ):
-                setElo(
-                    player.id,
-                    values["elo"]
-                    + round(
-                        self.getELoDiff(player, cadre, 1 if team == winner else 0)
-                        * BONI[role.strip(" 12345-")]
-                    ),
-                )
+            if (values["elo"] != None
+                and getData("PlayedGamesSeason", "players", ("PlayerId", player.id)) < 10):
+                setElo(player.id,values["elo"]+round(self.getELoDiff(player, cadre, 1 if team == winner else 0)*BONI[role.strip(" 12345-")]),)
             else:
                 self.getRanked(player)
 

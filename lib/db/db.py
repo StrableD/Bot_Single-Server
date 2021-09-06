@@ -43,7 +43,7 @@ def getData(table: str, columns: tuple[str], key: tuple[str]):
     return cursor.fetchall()
 
 # setzt die gegebenen infos in der tabelle
-def setData(table: str, colums: tuple(str), values: tuple(str), condition: str = None):
+def setData(table: str, colums: tuple[str], values: tuple, condition: str = None):
     try:
         if not condition:
             cmd = f"INSERT INTO {table} {colums} VALUES {values};"
@@ -92,6 +92,10 @@ def getElo(player_id: int):
         raise DataError
     else:
         return data[0]
+
+def setPlayerElo(player_id: int, new_elo: int):
+    if not setData("players", ("Elo"), (new_elo), f"PlayerID = {player_id}"):
+        raise DataError
 
 def getLeagues():
     league_dict = {}

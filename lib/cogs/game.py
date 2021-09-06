@@ -184,7 +184,7 @@ class Game(Cog):
                     lambda x, y: (x, gameCadre.keys().index(x))
                     if not y["dead"]
                     else None,
-                    gameCadre,
+                    gameCadre
                 )
             ).remove(None)
             playerNum = await takeSurvey(

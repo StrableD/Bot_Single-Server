@@ -1,3 +1,4 @@
+import json
 from numpy import average, e
 from lib.bot.constants import BONI, NoPerms, getCurrentGameCadre
 from lib.db.db import (
@@ -5,7 +6,9 @@ from lib.db.db import (
     getRoleID,
     getRoleTeam,
     getData,
-    getLeagues
+    getLeagues,
+    setData,
+    setPlayerElo
 )
 from random import choice
 from discord import Embed, Member
@@ -37,22 +40,16 @@ class Elo(Cog):
                 inline=True,
             )
             await ctx.send(embed=embed, delete_after=45.0)
-        elif players != [] and not any(
-            role.id == getRoleID("gamemaster") for role in ctx.author.roles
-        ):
+        elif players != [] and not any(role.id == getRoleID("gamemaster") for role in ctx.author.roles):
             raise NoPerms(["Adminrechte"])
-        elif players != [] and all(
-            elo := tuple(getElo(player.id) for player in players)
-        ):
+        elif players != [] and all(elo := tuple(getElo(player.id) for player in players)):
             embed = Embed(title="ELO Info", colour=ctx.author.colour)
             fields = []
             for player in players:
                 league = ""
                 for name, range in leagues.items():
-                    if (
-                        elo[players.index(player)] >= range[0]
-                        and elo[players.index(player)] <= range[1]
-                    ):
+                    if (elo[players.index(player)] >= range[0]
+                        and elo[players.index(player)] <= range[1]):
                         league = name
                 fields.append(
                     (player.display_name, (elo[players.index(player)], league), True)
@@ -100,55 +97,34 @@ class Elo(Cog):
     def eloDiff(teamElo: int, enemyElo: int, result: int):
         expect = round(1 / (1 + 10 ** ((enemyElo - teamElo) / 400)), 2)
         entwikl = (teamElo / 200) ** 4
-        sbr = round(e ** ((1500 - teamElo) / 150) - 1)
-        if teamElo < 1500 and result < expect:
-            entwikl += sbr
-        else:
-            sbr = 0
+        
+        sbr = round(e ** ((1500 - teamElo) / 150) - 1) if teamElo < 1500 and result < expect else 0
+        entwikl += sbr
+        
         if entwikl < 5:
             entwikl = 5
         elif sbr > 0 and entwikl >= 150:
             entwikl = 150
         elif sbr == 0 and entwikl >= 30:
             entwikl = 30
+        
         discrep = round(1800 * (result - expect) / entwikl)
         if discrep < -35:
             discrep = -35
+
         return discrep
 
     def getELoDiff(self, player: Member, cadre: dict, result: int):
         def getMedian(playerDict: dict):
-            median = 0
-            for elo in playerDict.values():
-                median += elo
+            median = sum(playerDict.values())
             return round(median / len(playerDict))
 
         def getOwnElo(playerElo: int, playerDict: dict):
-            if playerElo < average(playerDict.values()):
-                diff = round(
-                    (average(playerDict.values()) - playerElo) * e ** -1
-                    + round(
-                        playerElo
-                        / round(average(playerDict.values()))
-                        * len(playerDict)
-                        / 14,
-                        4,
-                    )
-                )
-                return round(playerElo + diff)
-            elif playerElo == average(playerDict.values()):
+            playersAverage = average(playerDict.values())
+            diff = lambda: round((playersAverage-playerElo)*e**-1+round(playerElo/round(playersAverage)*len(playerDict)/14,4))
+            if playerElo == playersAverage:
                 return playerElo
             else:
-                diff = round(
-                    (average(playerDict.values()) - playerElo) * e ** -1
-                    + round(
-                        playerElo
-                        / round(average(playerDict.values()))
-                        * len(playerDict)
-                        / 14,
-                        4,
-                    )
-                )
                 return round(playerElo + diff)
 
         playerDict = {}
@@ -162,31 +138,53 @@ class Elo(Cog):
         enemyElo = getMedian(enemyDict)
         return self.eloDiff(myElo, enemyElo, result)
 
-    def getRanked(self, player: Member):
+    def doRank(self, player: Member):
         playedGames = int(getData("players", ("PlayedGamesSeason"),("PlayerId", player.id)))
         if playedGames < 10:
             pass
         elif playedGames == 10:
             pass
+    
+    def getTeams(player: Member, game: dict):
+        playerTeam = getRoleTeam(game[player]["role"])
+        teammates, opponents = [player], []
+        if game[player]["lovebirds"]:
+            teammates.extend(dict(filter(lambda x: x[1]["lovebirds"], game.items())).keys())
+            opponents = list(map(lambda x: x not in teammates, game))
+        else:
+            del game[player]
+            for mate in game:
+                if playerTeam == getRoleTeam(game[mate]["role"]):
+                    teammates.append(mate)
+                else:
+                    opponents.append(mate)
+        return teammates, opponents
 
-    async def calculateElo(self, winner):
-        cadre = getCurrentGameCadre()
-        for player, plydict in cadre.items():
-            cadre[player]["elo"] = getElo(player.id)
-            cadre[player]["team"] = (
-                getRoleTeam(plydict["role"])
-                if not plydict["lovebirds"]
-                else "Liebespaar"
-            )
-        for player, values in cadre.items():
-            team = values["team"]
-            role = values["role"]
-            setPlayedGames(player.id)
-            if (values["elo"] != None
-                and getData("PlayedGamesSeason", "players", ("PlayerId", player.id)) < 10):
-                setElo(player.id,values["elo"]+round(self.getELoDiff(player, cadre, 1 if team == winner else 0)*BONI[role.strip(" 12345-")]),)
+    def increaseGames(self, player: Member, role:str, win: bool):
+        columns = ("PlayedGamesComplete", "WonGamesComplete", "PlayedGamesSeason", "WonGamesSeason", "WinsPerRole")
+        compGames, compWin, seasGames, seasWin, winDict = getData("players", columns, ("PlayerID", player.id))
+        winDict = json.loads(winDict)
+        if win:
+            winDict[role] = winDict[role] + 1 if role in winDict else 1
+            compWin += 1
+            seasWin += 1
+        compGames += 1
+        seasGames += 1
+        winDict = json.dumps(winDict)
+        setData("players", columns, (compGames,compWin,seasGames,seasWin,winDict), f"PlayerID = {player.id}")
+
+    async def calculateElo(self, winner: str):
+        """Die Elo der Spieler wird hier am Ende eines Spieles berechnet und gespeichert"""
+        game = getCurrentGameCadre()
+        for player in game:
+            game[player]["elo"] = getElo(player.id)
+            game[player]["team"] = getRoleTeam(game[player]["role"])
+        for player in game:
+            if int(getData("players", ("PlayedGameSeason"), ("PlayerID", player.id))) <= 10:
+                self.doRank(player)
             else:
-                self.getRanked(player)
+                setPlayerElo(player.id, game[player]["elo"]+self.getELoDiff(player,game, int(game[player]["team"] == winner)))
+            self.increaseGames(player, game[player]["role"], game[player]["team"] == winner)
 
     @Cog.listener()
     async def on_ready(self):

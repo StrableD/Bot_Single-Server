@@ -165,6 +165,11 @@ def setPlayingCadre(cadre: dict):
 
 
 def getCurrentGameCadre() -> dict[Member, dict[str, Union[bool, str]]]:
+    """
+    Hier wird der derzeitige Spielekader zurückgegeben.
+    Gespeichert sind:
+    Spieler: `Member`, Role: `str`, tot: `bool`, Hauptmann: `bool`, Liebespaar: `bool`
+    """
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:
         cadres = json.load(cadreFile)
     return cadres["currentgame"]

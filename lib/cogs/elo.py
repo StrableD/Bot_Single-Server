@@ -144,21 +144,6 @@ class Elo(Cog):
             pass
         elif playedGames == 10:
             pass
-    
-    def getTeams(player: Member, game: dict):
-        playerTeam = getRoleTeam(game[player]["role"])
-        teammates, opponents = [player], []
-        if game[player]["lovebirds"]:
-            teammates.extend(dict(filter(lambda x: x[1]["lovebirds"], game.items())).keys())
-            opponents = list(map(lambda x: x not in teammates, game))
-        else:
-            del game[player]
-            for mate in game:
-                if playerTeam == getRoleTeam(game[mate]["role"]):
-                    teammates.append(mate)
-                else:
-                    opponents.append(mate)
-        return teammates, opponents
 
     def increaseGames(self, player: Member, role:str, win: bool):
         columns = ("PlayedGamesComplete", "WonGamesComplete", "PlayedGamesSeason", "WonGamesSeason", "WinsPerRole")

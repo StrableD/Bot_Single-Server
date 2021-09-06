@@ -1,2 +1,5 @@
 /.vscode
-*.pyc
+**/__pycache__
+logs/
+**/database.db
+**/blueprints

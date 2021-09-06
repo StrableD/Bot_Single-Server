@@ -14,7 +14,7 @@ from lib.bot.constants import (
     setCurrentGameCadre,
 )
 from lib.cogs.settings import takeSurvey
-from lib.db.db import getChannelID, getElo, getRoleID 
+from lib.db.db import getChannelID, getElo, getRoleID, getRoleTeam 
 from numpy.random import randint
 
 
@@ -85,8 +85,10 @@ class Game(Cog):
                 delete_after=30.0,
             )
             return
+        
         playerList = []
         numGamemaster = 0
+        
         for member in ctx.author.voice.channel.members:
             if any(getRoleID("gamemaster") == role.id for role in member.roles):
                 numGamemaster += 1
@@ -100,6 +102,7 @@ class Game(Cog):
                 continue
             else:
                 playerList.append(member)
+        
         if len(playerList) < self.cadreLength:
             embed = Embed(
                 title="Kein Spielstart möglich",
@@ -116,6 +119,7 @@ class Game(Cog):
             )
             await ctx.send(embed=embed, delete_after=30.0)
             return
+        
         elif len(playerList) > self.cadreLength:
             embed = Embed(
                 title="Kein Spielstart möglich",
@@ -132,6 +136,7 @@ class Game(Cog):
             )
             await ctx.send(embed=embed, delete_after=30.0)
             return
+        
         else:
             await ctx.send(
                 "Es sind genug Spieler da. Wir beginnen mit der Rollenverteilung.",
@@ -271,7 +276,7 @@ class Game(Cog):
             resultCadre[player.display_name] = value
         winner = "Niemand"
         if any(lovebirds := filter(lambda n: n[1]["lovebirds"], gameCadre.items())):
-            teams = [getRoleIDTeam(value["role"]) for value in lovebirds.values()]
+            teams = [getRoleTeam(value["role"]) for value in lovebirds.values()]
             if not teams.count(2):
                 winner = "Liebespaar"
         else:
@@ -279,7 +284,7 @@ class Game(Cog):
             for value in gameCadre.values():
                 role, dead, captain, lovebirds = value.values()
                 if not dead and not lovebirds:
-                    livingTeams.add(getRoleIDTeam(role))
+                    livingTeams.add(getRoleTeam(role))
                 elif not dead and lovebirds:
                     livingTeams.add("Liebespaar")
             if "Jason" in livingTeams:

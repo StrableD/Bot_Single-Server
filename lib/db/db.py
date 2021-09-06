@@ -77,6 +77,15 @@ def getRoleID(bot_name: str):
     else:
         return int(data[0])
 
+def getRoleTeam(bot_name: str):
+    data = getData("roles", ("team"), ("name_bot", bot_name))
+    if len(data) != 1:
+        raise DatabaseError
+    elif not data[0] or not data[0].isdecimal():
+        raise DataError
+    else:
+        return str(data[0])
+
 def getElo(player_id: int):
     data = getData("players", ("Elo"), ("PlayerID", player_id))
     if len(data) != 1:

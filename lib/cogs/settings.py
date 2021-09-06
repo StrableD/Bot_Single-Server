@@ -11,7 +11,7 @@ from lib.bot.constants import (
     setDefaultCadre,
     setPlayingCadre,
 )
-from lib.db.db import getChannel, getRole
+from lib.db.db import getChannelID, getRoleID
 from num2words import num2words  # type: ignore
 from word2number import w2n
 
@@ -83,7 +83,7 @@ class Settings(Cog):
 
     async def getNewCadre(self, ctx: Context):
         content = []
-        for channel in ctx.guild.get_channel(getChannel("default_cadre")).text_channels:
+        for channel in ctx.guild.get_channel(getChannelID("default_cadre")).text_channels:
             content.append((channel.name, channel.name[:2]))
         cadreSize = await takeSurvey(ctx, "Welche Kadergröße hättest du gerne", content)
 
@@ -118,7 +118,7 @@ class Settings(Cog):
         return squadDict
 
     @command(name="standardkader", aliases=["dafaultcadre", "defcadre"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def setDefaultCadre(self, ctx: Context):
         """
         Hiermit kannst du den Standard-Kader des Bots festlegen.
@@ -139,7 +139,7 @@ class Settings(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     @command(name="change", aliases=["ändern", "wechseln"])
-    @has_role(getRole("gamemaster"))
+    @has_role(getRoleID("gamemaster"))
     async def changeCadre(self, ctx: Context, clear: bool = False):
         """
         Hiermit änderst du den aktuellen Spielekader.

@@ -1,6 +1,6 @@
 from datetime import date
 from discord.ext.commands.errors import CheckFailure
-from lib.db.db import getChannel
+from lib.db.db import getChannelID
 from typing import Optional, get_args
 
 from discord import Colour, Embed, User
@@ -145,7 +145,7 @@ class Help(Cog):
         Hierfür wird der Discordname und der Diskriminator eingegeben werden.
         ``player``: Der Spieler in Form von Name#Diskriminator
         """
-        inviteChannel = ctx.guild.get_channel(getChannel("invites"))
+        inviteChannel = ctx.guild.get_channel(getChannelID("invites"))
         invite = await inviteChannel.create_invite(
             max_age=10800,
             max_uses=1,

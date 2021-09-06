@@ -15,7 +15,6 @@ from discord.ext.commands.converter import RoleConverter
 from discord.ext.commands.errors import CheckFailure, RoleNotFound
 
 BOTPATH = abspath(PurePath(__file__).parents[2])
-print(BOTPATH)
 
 with open(BOTPATH + "/data/auth.json", "r") as jsonfile:
     DBPASSWORD = load(jsonfile).get("password")

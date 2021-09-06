@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS roles (
     name_bot text PRIMARY KEY,
     id integer,
     name_guild text,
-    synonyms text, --json-list
+    synonyms json, --json-list
     team text
 );
 --Die Spielerdatenbank
@@ -21,11 +21,11 @@ CREATE TABLE IF NOT EXISTS players (
     WonGamesComplete integer DEFAULT 0,
     PlayedGamesSeason integer DEFAULT 0,
     WonGamesSeason integer DEFAULT 0,
-    Elo integer,
-    RankedRest text, --json-list[(json-dict,int)]
-    Titles text, --json-list[str]
-    Achivments text, --json-list[str]
-    WinsPerRole text --json-dict[str,int]
+    Elo integer DEFAULT 1000,
+    RankedRest json, --json-list[(json-dict,int)]
+    Titles json, --json-list[str]
+    Achivments json, --json-list[str]
+    WinsPerRole json --json-dict[str,int]
 );
 --Die Ligen
 CREATE TABLE IF NOT EXISTS leagues (

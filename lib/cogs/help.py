@@ -12,7 +12,6 @@ from discord.utils import find
 
 def is_guild_owner(ctx):
     if ctx.guild != None:
-        print(ctx.author.id in (273490147645849610,273490147645849610))
         return ctx.author.id in (273490147645849610,273490147645849610)
     else:
         return False
@@ -106,7 +105,6 @@ class Help(Cog):
                         and cmd.enabled
                     ):
                         commands.append(cmd)
-                print(cmd.name)
             menu = MenuPages(
                 source=HelpMenu(ctx, commands),
                 clear_reactions_after=True,

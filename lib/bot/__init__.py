@@ -11,7 +11,7 @@ from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
 from discord.message import Message
 from lib.bot.constants import BOTPATH, COGS, TOKEN, NoPerms
-from lib.db.db import autosave, getChannelID
+from lib.db.db import autosave, getChannelID, updateMembers
 from eventemitter import EventEmitter  # type: ignore
 
 IGNORE_EXCEPTIONS = (CommandNotFound, NoPerms)
@@ -76,6 +76,7 @@ class My_Bot(Bot):
                 updateTxt = updatefile.read()
             self.emitter.emit("bot_update", updateTxt)
             self.update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
+        updateMembers(self.guild.members)
 
     def run(self):
         print("running setup...")

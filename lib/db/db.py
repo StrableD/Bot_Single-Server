@@ -1,11 +1,10 @@
-from datetime import date
 import json
 from os.path import isfile
 from sqlite3.dbapi2 import DataError, DatabaseError
 from types import FunctionType
 from typing import Optional, Union
 
-from discord import Role
+from discord import Member
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from lib.bot.constants import BUILDPATH, InputError, MYDB, ParameterError
@@ -38,9 +37,9 @@ def autosave(sched: AsyncIOScheduler):
 
 # holt sich die angeforderte infos
 def getData(table: str, columns: tuple[str], key: tuple[str]):
-    cmd = f"SELECT {columns} FROM {table} WHERE {'='.join(key)};"
+    cmd = f"SELECT {columns} FROM {table} WHERE {key[0]} = '{key[1]}';"
     cursor.execute(cmd)
-    return cursor.fetchall()
+    return cursor.fetchone()
 
 # setzt die gegebenen infos in der tabelle
 def setData(table: str, colums: tuple[str], values: tuple, condition: str = None):
@@ -102,3 +101,10 @@ def getLeagues():
     for row in cursor.execute("SELECT * FROM leagues;"):
         league_dict[row[0]] = (row[1] if not row[1] else 0, row[2] if not row[2] else 10000)
     return league_dict
+
+def updateMembers(members: list[Member]):
+    for member in members:
+        cmd = f"""IF({member.id} IN SELECT PlayerID FROM players, 
+                UPDATE players SET PlayerName = '{member.display_name}' WHERE PlayerID = '{member.id}'',
+                INSERT INTO players(PlayerName, PlayerID) VALUES ({(member.display_name, member.id)});)"""
+        cursor.execute(cmd)

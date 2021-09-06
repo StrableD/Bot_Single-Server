@@ -161,8 +161,7 @@ class Help(Cog):
             await ctx.message.delete()
 
     @command(name="newseason", aliases=["season"])
-    #@check(is_guild_owner)
-    @has_role(getRoleID("gamemaster"))
+    @check(is_guild_owner)
     async def invitePlayer(self, ctx: Context):
         self.bot._season_date = date.today()
         resetSeason()

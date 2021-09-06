@@ -1,4 +1,2 @@
 /.vscode
-/lib/db/__pychache__
-/lib/bot/__pychache__
-/lib/cogs/__pychache__
+*.pyc

@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS players (
     PlayedGamesSeason integer DEFAULT 0,
     WonGamesSeason integer DEFAULT 0,
     Elo integer DEFAULT 1300,
-    RankedRest json, --json-list[(json-dict,int)]
     Titles json, --json-list[str]
     Achivments json, --json-list[str]
     WinsPerRole json --json-dict[str,int]

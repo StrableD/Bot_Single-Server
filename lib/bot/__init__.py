@@ -135,6 +135,9 @@ class My_Bot(Bot):
                 self.update_bot, CronTrigger(day_of_week=3, hour=5, minute=0, second=0)
             )
             self.emitter.on("bot_update", self.printUpdateTxt)
+            
+            print("updating the members")
+            updateMembers(self.guild.members)
 
             while not self.cogs_ready.all_ready():
                 await sleep(0.5)

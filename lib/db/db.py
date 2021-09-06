@@ -53,39 +53,39 @@ def setData(table: str, colums: tuple[str], values: tuple, condition: str = None
     else:
         return True
 
-def getChannelID(bot_name: str):
+def getChannelID(bot_name: str)->int:
     data = getData("channels", ("id"), ("name_bot", bot_name))
-    if len(data) != 1:
-        raise DatabaseError
-    elif not data[0] or type(data[0]) != int:
+    if data == None or type(data[0]) != int:
         raise DataError
+    elif len(data) != 1 :
+        raise DatabaseError
     else:
         return data[0]
 
-def getRoleID(bot_name: str):
+def getRoleID(bot_name: str)->int:
     data = getData("roles", ("id"), ("name_bot", bot_name))
-    if len(data) != 1:
-        raise DatabaseError
-    elif not data[0] or type(data[0]) != int:
+    if data == None or type(data[0]) != int:
         raise DataError
+    elif len(data) != 1 :
+        raise DatabaseError
     else:
         return data[0]
 
-def getRoleTeam(bot_name: str):
+def getRoleTeam(bot_name: str)->str:
     data = getData("roles", ("team"), ("name_bot", bot_name))
-    if len(data) != 1:
-        raise DatabaseError
-    elif not data[0] or type(data[0]) != str:
+    if data == None or type(data[0]) != str:
         raise DataError
+    elif len(data) != 1 :
+        raise DatabaseError
     else:
         return data[0]
 
-def getElo(player_id: int):
+def getElo(player_id: int)->int:
     data = getData("players", ("Elo"), ("PlayerID", player_id))
-    if len(data) != 1:
-        raise DatabaseError
-    elif not data[0] or type(data[0]) != int:
+    if data == None or type(data[0]) != int:
         raise DataError
+    elif len(data) != 1 :
+        raise DatabaseError
     else:
         return data[0]
 
@@ -96,12 +96,18 @@ def setPlayerElo(player_id: int, new_elo: int):
 def getLeagues():
     league_dict = {}
     for row in cursor.execute("SELECT * FROM leagues;"):
-        league_dict[row[0]] = (row[1] if not row[1] else 0, row[2] if not row[2] else 10000)
+        league_dict[row[0]] = (row[1] if row[1] != None else 0, row[2] if row[2] != None else 10000)
+    print(league_dict)
     return league_dict
 
 def updateMembers(members: list[Member]):
     for member in members:
-        cmd = f"""IF({member.id} IN SELECT PlayerID FROM players, 
-                UPDATE players SET PlayerName = '{member.display_name}' WHERE PlayerID = '{member.id}'',
-                INSERT INTO players(PlayerName, PlayerID) VALUES ({(member.display_name, member.id)});)"""
+        playerids = cursor.execute("SELECT PlayerID FROM players").fetchall()
+        playerids = tuple(map(lambda x: x[0], playerids))
+        if not bool(playerids):
+            cmd = f"INSERT INTO players(PlayerName, PlayerID) VALUES {(member.display_name, member.id)};"
+        elif member.id in playerids:
+            cmd = f"UPDATE players SET PlayerName = '{member.display_name}' WHERE PlayerID = '{member.id}';"
+        else:
+            cmd = f"INSERT INTO players(PlayerName, PlayerID) VALUES {(member.display_name, member.id)};"
         cursor.execute(cmd)

@@ -41,27 +41,25 @@ MYDB = connect(DBPATH, check_same_thread=False)
 
 
 class MyRoleConverter(RoleConverter):
-    async def convert(self, ctx, argument):
+    async def convert(self, ctx, *argument):
+        argument = " ".join(argument)
         try:
-            return await super.convert(ctx, argument)
+            return await super().convert(ctx, argument)
         except RoleNotFound:
             for row in MYDB.execute("SELECT name_bot, synonyms FROM roles"):
-                synonymList = [row[0]].extend(row[1])
+                synonymList = [row[0]]
+                if row[1] != None: synonymList.extend(json.loads(row[1]))
+                print(synonymList)
                 if str(argument).lower() in synonymList:
                     roleID = MYDB.execute(
                         "SELECT id FROM roles WHERE name_bot = ?", (synonymList[0],)
                     ).fetchone()[0]
-                    return await super.convert(ctx, roleID)
+                    return await super().convert(ctx, str(roleID))
             raise RoleNotFound
 
 
 class InputError(Exception):
     pass
-
-
-class ParameterError(InputError):
-    pass
-
 
 class NoPerms(CheckFailure):
     def __init__(self, message):
@@ -133,8 +131,24 @@ ROLEAURA = {
     "special": ["hexe", "jäger", "seherin", "werschweinchen", "der-rabe"],
 }
 
-BONI = {}
-
+BONI = {"weißer-werwolf": 0.5,
+        "lovebirds": 0.4,
+        "dorfbewohner": 0.35,
+        "amor": 0.35,
+        "jäger": 0.3,
+        "werschweinchen": 0.25,
+        "der-rabe": 0.25,
+        "jason": 0.25,
+        "dorfdepp": 0.25,
+        "werwolf": 0.2,
+        "geschwister": 0.15,
+        "werwolfjunges": 0.15,
+        "rotkäppchen": 0.1,
+        "polarwolf": 0.1,
+        "hexe": 0.1,
+        "wolfseher": 0.1,
+        "seherin": 0.05
+        }
 
 def getCadre() -> dict[str, int]:
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:

@@ -1,13 +1,10 @@
-import json
 from os.path import isfile
 from sqlite3.dbapi2 import DataError, DatabaseError
-from types import FunctionType
-from typing import Optional, Union
 
 from discord import Member
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from lib.bot.constants import BUILDPATH, InputError, MYDB, ParameterError
+from lib.bot.constants import BUILDPATH, MYDB
 
 cursor = MYDB.cursor()
 

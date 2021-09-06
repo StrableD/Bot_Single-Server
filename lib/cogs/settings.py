@@ -1,12 +1,13 @@
 from lib.bot import My_Bot
 from pathlib import Path
 
-from discord import Colour, Embed, Guild, Emoji
+from discord import Colour, Embed, Guild, Emoji, Member
 from discord.ext.commands import Cog, Context, command, has_role
 from discord.utils import get
 from lib.bot.constants import (
     BOTPATH,
     EMOJIS,
+    MyRoleConverter,
     getCadre,
     setDefaultCadre,
     setPlayingCadre,
@@ -221,6 +222,16 @@ class Settings(Cog):
 
         embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
+        await ctx.message.delete()
+    
+    @command(name="setRole", aliases=["gibRolle", "role"])
+    async def setPlayerRole(self, ctx: Context, player: Member, role: MyRoleConverter):
+        await player.add_roles(role)
+        await ctx.send(embed = Embed(
+            title = "Rollen des Spielers",
+            description = f"Der Spieler {player.display_name} hat folgende Rollen:",
+            color = Colour.random()
+        ).add_field(name = "Rollen",value = "\n".join(map(lambda x: x.name,player.roles))), delete_after=100.0)
         await ctx.message.delete()
 
     async def delEmojis(self, EmojiList: list[Emoji]):

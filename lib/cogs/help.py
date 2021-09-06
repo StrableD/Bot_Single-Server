@@ -99,11 +99,8 @@ class Help(Cog):
                     if not cmd.hidden and cmd.enabled:
                         commands.append(cmd)
                 else:
-                    if (
-                        not any(map(lambda f: f == is_guild_owner, cmd.checks))
-                        and not cmd.hidden
-                        and cmd.enabled
-                    ):
+                    if (not any(map(lambda f: f == is_guild_owner, cmd.checks))
+                        and not cmd.hidden and cmd.enabled):
                         commands.append(cmd)
             menu = MenuPages(
                 source=HelpMenu(ctx, commands),
@@ -117,9 +114,7 @@ class Help(Cog):
             )
             await ctx.message.delete()
         else:
-            if command := find(
-                lambda m: m.name == cmd or cmd in m.aliases, self.bot.commands
-            ):
+            if command := find(lambda m: m.name == cmd or cmd in m.aliases, self.bot.commands):
                 if any(check(ctx) for check in command.checks) or command.checks == []:
                     await self.cmdHelp(ctx, command)
                 else:

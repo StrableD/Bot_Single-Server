@@ -18,7 +18,7 @@ from discord.ext.commands import Cog, command, Greedy, Context
 class Elo(Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.emitter.on("clacElo", self.calculateElo)
+        self.bot.emitter.on("calcElo", self.calculateElo)
 
     @command(name="elo")
     async def getPlayerElo(self, ctx: Context, players: Greedy[Member]):
@@ -136,14 +136,16 @@ class Elo(Cog):
                 enemyDict[ply] = values["elo"]
         myElo = getOwnElo(cadre[player]["elo"], playerDict)
         enemyElo = getMedian(enemyDict)
-        return self.eloDiff(myElo, enemyElo, result)
+        elo = self.eloDiff(myElo, enemyElo, result)
+        if result:
+            elo = round(elo * BONI[cadre[player]["role"].strip(" 1234567890-").lower()])
+        return elo
 
     def doRank(self, player: Member):
-        playedGames = int(getData("players", ("PlayedGamesSeason"),("PlayerId", player.id)))
-        if playedGames < 10:
-            pass
-        elif playedGames == 10:
-            pass
+        playedGames, wonGames = getData("players", ("PlayedGamesSeason", "WonGameSeason"),("PlayerId", player.id))
+        placementValue = 2*wonGames - playedGames
+        elo = 1300 + placementValue * 50
+        setPlayerElo(player.id, elo)
 
     def increaseGames(self, player: Member, role:str, win: bool):
         columns = ("PlayedGamesComplete", "WonGamesComplete", "PlayedGamesSeason", "WonGamesSeason", "WinsPerRole")
@@ -165,11 +167,15 @@ class Elo(Cog):
             game[player]["elo"] = getElo(player.id)
             game[player]["team"] = getRoleTeam(game[player]["role"])
         for player in game:
-            if int(getData("players", ("PlayedGameSeason"), ("PlayerID", player.id))) <= 10:
+            won = game[player]["team"] == winner
+            self.increaseGames(player, game[player]["role"], won)
+            if getData("players", ("PlayedGameSeason"), ("PlayerID", player.id))[0] <= 6:
                 self.doRank(player)
             else:
-                setPlayerElo(player.id, game[player]["elo"]+self.getELoDiff(player,game, int(game[player]["team"] == winner)))
-            self.increaseGames(player, game[player]["role"], game[player]["team"] == winner)
+                eloDiff = self.getELoDiff(player,game, int(won))
+                newElo = game[player]["elo"]+ eloDiff
+                setPlayerElo(player.id, newElo)
+            
 
     @Cog.listener()
     async def on_ready(self):

@@ -13,9 +13,50 @@ from discord.message import Message
 from lib.bot.constants import BOTPATH, COGS, TOKEN, NoPerms
 from lib.db.db import autosave, getChannelID, updateMembers
 from eventemitter import EventEmitter  # type: ignore
+import logging
+import logging.config
 
 IGNORE_EXCEPTIONS = (CommandNotFound, NoPerms)
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": True,
+    "formatters":{
+        'default': {
+            "class": "logging.Formatter",
+            'format': '%(asctime)s %(levelname)s %(name)s %(message)s'
+        },
+        "special":{
+            "class": "logging.Formatter",
+            "format": "[%(levelname)s]%(asctime)s %(module)s.%(funcName)s [%(lineno)d]: %(message)s\n",
+            "datefmt": "%d.%M.%Y %H:%M:%S"
+        },
+    },
+    "handlers":{
+        "file":{
+            "class": "logging.FileHandler",
+            "level": "WARNING",
+            "formatter": "special",
+            "filename": f"logs/logs_{date.today()}.log",
+            "mode": "a"
+        },
+        'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'default',
+                'level': 'INFO'
+            },
+    },
+    "loggers":{
+        "Error_Logger":{
+            "handlers": ["file"]
+        },
+    },
+    "root":{
+        "handlers": ["console"],
+        "level":"WARNING"
+    }
+}
+logging.config.dictConfig(LOGGING)
 
 class Ready(object):
     def __init__(self):
@@ -40,6 +81,7 @@ class My_Bot(Bot):
         self.guild: Guild = None
         self.scheduler = AsyncIOScheduler()
         self.emitter = EventEmitter()
+        self.logger = logging.getLogger("Error_Logger")
 
         self.ghostvoices = False
         self._season_date = date.today()
@@ -112,11 +154,16 @@ class My_Bot(Bot):
     async def on_disconnect(self):
         print("bot disconnected")
 
-    async def on_error(self, err, *args, **kwargs):
-        if err == "on_command_error" and args[0].command.name not in ("invite", "elo"):
+    async def on_error(self, err, *args):
+        if err == "on_command_error" and args[0].command.name not in ("invite", "elo", "chronicle"):
             await args[0].send("Command Error", delete_after=15.0)
-
-        print("An Error occurred")
+        
+        if len(args)>1:
+            self.logger.warning(f"An Error occurred: {args[1]}")
+        elif len(args)==1:
+            self.logger.warning(f"An Error occurred: {args[0]}")
+        else:
+            self.logger.warning(f"An Error occurred")
         raise  # type: ignore
 
     async def on_command_error(self, ctx, exc):

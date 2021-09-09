@@ -195,8 +195,13 @@ class Game(Cog):
             if self.checkRolePos(role, ctx.guild) and role.id != 768494431136645127:
                 await player.remove_roles(role)
         await player.add_roles(ctx.guild.get_role(getRoleID("dead")))
+        #Der zwischengespeicherte Spielekader wird akktualisiert
         gameCadre[player]["dead"] = True
         setCurrentGameCadre(gameCadre)
+        #Der Nickname des Spielers wird geändert
+        nick = player.display_name
+        await player.edit(nick=f"♰ {nick}")
+        #Die Nachricht des erfolgreichen Tötens wird gesendet
         embed = Embed(
             title="Erfolgreich getötet!",
             description=f"Der Spieler {player.name} wurde getötet.",
@@ -328,6 +333,9 @@ class Game(Cog):
         self.bot._current_gamemaster = None
         self.bot._lastRound = date.today()
         self.bot.ghostvoices = False
+        for player in gameCadre:
+            nick:str = player.display_name
+            await player.edit(nick=nick.removeprefix("♰"))
         setCurrentGameCadre({})
 
     @command(name="next", aliases=["moveon", "weiter"], enabled=False, hidden=True)

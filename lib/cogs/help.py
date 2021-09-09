@@ -169,6 +169,8 @@ class Help(Cog):
                 delete_after=20.0,
             )
             await ctx.message.delete()
+        else:
+            raise exc
 
     @command(name="newseason", aliases=["season"])
     @check(is_guild_owner)

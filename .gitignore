@@ -3,3 +3,4 @@
 logs/
 **/database.db
 **/blueprints
+**/*.log

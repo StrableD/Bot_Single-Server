@@ -94,6 +94,8 @@ class Elo(Cog):
                 f"Du kannst keine Elo Infos zu anderen Personen holen, da dir folgende Berechtigung fehlt: {exc.message}",
                 delete_after=30.0,
             )
+        else:
+            raise exc
 
     def eloDiff(teamElo: int, enemyElo: int, result: int):
         expect = round(1 / (1 + 10 ** ((enemyElo - teamElo) / 400)), 2)

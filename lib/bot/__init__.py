@@ -118,7 +118,7 @@ class My_Bot(Bot):
                 updateTxt = updatefile.read()
             self.emitter.emit("bot_update", updateTxt)
             self.update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
-        updateMembers(self.guild.members)
+        updateMembers([map(lambda x: not x.bot, self.guild.members)])
 
     def run(self):
         print("running setup...")

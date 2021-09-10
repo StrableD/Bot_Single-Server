@@ -10,7 +10,6 @@ from lib.db.db import (
     setData,
     setPlayerElo
 )
-from random import choice
 from discord import Embed, Member, Colour
 from discord.ext.commands import Cog, command, Greedy, Context
 

@@ -68,8 +68,7 @@ async def takeSurvey(ctx: Context, theme: str, content: list[tuple]):
             if str(reaction) == string:
                 return number
     else:
-        reaction = str(reaction.emoji.name).strip("keycap_")
-        print(reaction)
+        reaction = str(reaction.emoji.name)[7:]
         return w2n.word_to_num(reaction)
 
 

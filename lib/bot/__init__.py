@@ -16,6 +16,15 @@ from eventemitter import EventEmitter  # type: ignore
 import logging
 import logging.config
 
+class Log_Filter(logging.Filter):
+    def __init__(self, level, name = ""):
+        self.__level = level
+        super().__init__(name)
+    
+    def fiter(self, record):
+        return record.levelno == self.__level
+
+
 IGNORE_EXCEPTIONS = (CommandNotFound, NoPerms)
 
 LOGGING = {
@@ -26,18 +35,38 @@ LOGGING = {
             "class": "logging.Formatter",
             'format': '%(asctime)s %(levelname)s %(name)s %(message)s'
         },
-        "special":{
+        "error":{
             "class": "logging.Formatter",
             "format": "[%(levelname)s]%(asctime)s %(module)s.%(funcName)s [%(lineno)d]: %(message)s\n",
             "datefmt": "%d.%M.%Y %H:%M:%S"
         },
+        "info":{
+            "class": "logging.Formatter",
+            "format": "[%(levelname)s]%(asctime)s %(command)s [%(author)s]: %(message)s",
+            "datefmt": "%d.%M.%Y %H:%M:%S"
+        },
+    },
+    "filters": {
+        "info_filter":{
+            "()": Log_Filter,
+            "name": "info_filter",
+            "level": "INFO"
+        }
     },
     "handlers":{
-        "file":{
+        "err_file":{
             "class": "logging.FileHandler",
             "level": "WARNING",
-            "formatter": "special",
+            "formatter": "error",
             "filename": f"logs/logs_{date.today()}.log",
+            "mode": "a"
+        },
+        "info_file":{
+            "class": "logging.FileHandler",
+            "level": "INFO",
+            "formatter": "info",
+            #"filters": ["info_filter"],
+            "filename": f"logs/infos_{date.today()}.log",
             "mode": "a"
         },
         'console': {
@@ -48,12 +77,12 @@ LOGGING = {
     },
     "loggers":{
         "Error_Logger":{
-            "handlers": ["file"]
-        },
+            "handlers": ["err_file", "info_file"]
+        }
     },
     "root":{
         "handlers": ["console"],
-        "level":"WARNING"
+        "level":"INFO"
     }
 }
 logging.config.dictConfig(LOGGING)
@@ -65,7 +94,7 @@ class Ready(object):
 
     def ready_up(self, cog):
         setattr(self, cog, True)
-        print(f" {cog} cog ready")
+        bot.logger.info(f" {cog} cog ready", extra={"command":"ready_up", "author":"func"})
 
     def all_ready(self):
         return all([getattr(self, cog) for cog in COGS])
@@ -100,9 +129,9 @@ class My_Bot(Bot):
     def setup(self):
         for cog in COGS:
             self.load_extension(f"lib.cogs.{cog}")
-            print(f" {cog} cog loaded")
+            self.logger.info(f" {cog} cog loaded", extra={"command":"setup", "author":"func"})
 
-        print("setup complete")
+        self.logger.info("setup complete", extra={"command":"setup", "author":"func"})
 
     async def printUpdateTxt(self, updateTxt: str):
         await self.guild.get_channel(getChannelID("bot_channel")).send(
@@ -121,11 +150,11 @@ class My_Bot(Bot):
         updateMembers([map(lambda x: not x.bot, self.guild.members)])
 
     def run(self):
-        print("running setup...")
+        self.logger.info("running setup...", extra={"command":"run", "author":"func"})
         self.setup()
 
         super().run(TOKEN, reconnect=True)
-        print("bot is running...")
+        self.logger.info("bot is running...", extra={"command":"run", "author":"func"})
 
     async def process_commands(self, message: Message):
         ctx = await self.get_context(message, cls=Context)
@@ -138,21 +167,25 @@ class My_Bot(Bot):
                 )
             else:
                 await self.invoke(ctx)
+                self.logger.info(f"Es wurde ein Command ausgeführt im Channel {ctx.channel.name}", 
+                                 extra={"command":ctx.command, "author":ctx.author.display_name})
 
-    async def process_ghostvoices(self, messsage: Message):
+    async def process_ghostvoices(self, message: Message):
         if self.ghostvoices:
             channel = self.get_channel(getChannelID("ghostvoices"))
-            msg = f"Von {messsage.author.display_name}: \n"
-            msg += f'"{messsage.content}"'
+            msg = f"Von {message.author.display_name}: \n"
+            msg += f'"{message.content}"'
             await channel.send(msg) if channel != None else await self.get_user(
                 self.owner_id
             ).send("Die Geisterstimme konnte nicht gesendet werden")
+            self.logger.info(f'Es wurde eine Geisterstimme abgegeben: "{message.content}"', 
+                             extra={"command": "Geisterstimme", "author":message.author.display_name})
 
     async def on_connect(self):
-        print("bot connected")
+        self.logger.info("bot connected", extra={"command":"on_connect", "author":"func"})
 
     async def on_disconnect(self):
-        print("bot disconnected")
+        self.logger.info("bot disconnected", extra={"command":"on_disconnect", "author":"func"})
 
     async def on_error(self, err, *args):
         if err == "on_command_error" and args[0].command.name not in ("invite", "elo", "chronicle"):
@@ -183,16 +216,16 @@ class My_Bot(Bot):
             )
             self.emitter.on("bot_update", self.printUpdateTxt)
             
-            print("updating the members")
+            self.logger.info("updating the members", extra={"command":"on_ready", "author":"func"})
             updateMembers(self.guild.members)
 
             while not self.cogs_ready.all_ready():
                 await sleep(0.5)
 
             self.ready = True
-            print("bot is ready")
+            self.logger.info("bot is ready", extra={"command":"on_ready", "author":"func"})
         else:
-            print("bot reconnected")
+            self.logger.info("bot reconnected", extra={"command":"on_ready", "author":"func"})
 
     async def on_message(self, message: Message):
         if not message.author.bot:

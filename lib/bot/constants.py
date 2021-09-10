@@ -2,7 +2,6 @@
 Gibt Zugriff auf die Konstanten für den Bot.
 """
 
-from json import load
 import json
 from os import chmod, scandir
 from os.path import abspath
@@ -17,10 +16,10 @@ from discord.ext.commands.errors import CheckFailure, RoleNotFound
 BOTPATH = abspath(PurePath(__file__).parents[2])
 
 with open(BOTPATH + "/data/auth.json", "r") as jsonfile:
-    DBPASSWORD = load(jsonfile).get("password")
+    DBPASSWORD = json.load(jsonfile).get("password")
 
 jsonfile = open(BOTPATH + "/data/auth.json", "r")
-TOKEN: str = load(jsonfile).get("token")
+TOKEN: str = json.load(jsonfile).get("token")
 jsonfile.close()
 del jsonfile
 
@@ -64,7 +63,6 @@ class NoPerms(CheckFailure):
     def __init__(self, message):
         self.message = ",".join(message) if type(message) != str else message
         super().__init__(self.message)
-
 
 ALL_ROLES = [
     "Werwolf-1",

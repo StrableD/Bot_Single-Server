@@ -39,6 +39,7 @@ def getData(table: str, columns: tuple[str], key: tuple[str]):
     return cursor.fetchone()
 
 # setzt die gegebenen infos in der tabelle
+@with_commit
 def setData(table: str, colums: tuple[str], values: tuple, condition: str = None):
     try:
         if not condition:
@@ -99,9 +100,11 @@ def getLeagues():
         league_dict[row[0]] = (row[1] if row[1] != None else 0, row[2] if row[2] != None else 10000)
     return league_dict
 
+@with_commit
 def resetSeason():
     cursor.execute("UPDATE players SET PlayedGamesSeason = 0, WonGamesSeason = 0, Elo = 1300;")
 
+@with_commit
 def updateMembers(members: list[Member]):
     for member in members:
         playerids = cursor.execute("SELECT PlayerID FROM players").fetchall()

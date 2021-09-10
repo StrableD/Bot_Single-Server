@@ -1,7 +1,6 @@
 from datetime import date
-from discord.ext.commands.core import has_role
 from discord.ext.commands.errors import CheckFailure
-from lib.db.db import getChannelID, getRoleID, resetSeason
+from lib.db.db import getChannelID, resetSeason
 from typing import Optional, get_args
 
 from discord import Colour, Embed, User

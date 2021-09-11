@@ -10,7 +10,7 @@ from discord.errors import NotFound
 from discord.ext.commands import Bot, Context
 from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
-from discord.message import DeletedReferencedMessage, Message
+from discord.message import Message
 from lib.bot.constants import BOTPATH, COGS, TOKEN, NoPerms
 from lib.db.db import autosave, getChannelID, updateMembers
 from eventemitter import EventEmitter  # type: ignore
@@ -146,11 +146,11 @@ class My_Bot(Bot):
         for cog_name in cogs.keys():
             self.reload_extension("lib.cogs." + cog_name.lower())
         if self.update_date < getmtime(BOTPATH + "/lib/bot/update.txt"):
-            with open(BOTPATH + "/lib/bot/update.txt", "r", encoding="UTF-8") as updatefile:
+            with open(BOTPATH + "/lib/bot/update.txt", "r", encoding="utf-8") as updatefile:
                 updateTxt = updatefile.read()
             self.emitter.emit("bot_update", updateTxt)
             self.update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
-        updateMembers([map(lambda x: not x.bot, self.guild.members)])
+        updateMembers(list(filter(lambda x: not x.bot, self.guild.members)))
 
     def run(self):
         self.logger.info("running setup...", extra={"command":"run", "author":"func"})
@@ -224,7 +224,7 @@ class My_Bot(Bot):
             self.emitter.on("bot_update", self.printUpdateTxt)
             
             self.logger.info("updating the members", extra={"command":"on_ready", "author":"func"})
-            updateMembers(self.guild.members)
+            updateMembers(list(filter(lambda x: not x.bot, self.guild.members)))
 
             while not self.cogs_ready.all_ready():
                 await sleep(0.5)

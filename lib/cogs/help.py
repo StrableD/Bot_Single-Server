@@ -1,18 +1,22 @@
 from datetime import date
-from discord.ext.commands.errors import CheckFailure
-from lib.db.db import getChannelID, resetSeason
+
+from discord.mentions import AllowedMentions
+from lib.bot.constants import BOTPATH
+from os.path import getmtime
 from typing import Optional, get_args
 
 from discord import Colour, Embed, User
-from discord.ext.commands import Bot, Cog, Command, command, Context, check
+from discord.ext.commands import Bot, Cog, Command, Context, check, command
 from discord.ext.commands.converter import _Greedy
+from discord.ext.commands.errors import CheckFailure
 from discord.ext.menus import ListPageSource, MenuPages
 from discord.utils import find
+from lib.db.db import getChannelID, resetSeason
 
 
 def is_guild_owner(ctx):
     if ctx.guild != None:
-        return ctx.author.id in (273490147645849610,273490147645849610)
+        return ctx.author.id in (273490147645849610,312644293602836482)
     else:
         return False
 
@@ -172,6 +176,16 @@ class Help(Cog):
         self.bot._season_date = date.today()
         resetSeason()
         await ctx.send("""__Die Saison wurde beendet und eine neue angefangen.__\n\nDie gespielten Spiele und die Elo wurden zurückgesetzt""")
+    
+    @command(name="update")
+    @check(lambda ctx: ctx.author.id == ctx.bot.owner_id)
+    async def updateManualy(self, ctx: Context):
+        if not self.bot.update_date < getmtime(BOTPATH + "/lib/bot/update.txt"):
+            with open(BOTPATH + "/lib/bot/update.txt", "r", encoding="utf-8") as updatefile:
+                updateTxt = updatefile.read()
+            self.bot.emitter.emit("bot_update", updateTxt)
+            self.bot.update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
+        self.bot.update_bot()
 
     @Cog.listener()
     async def on_ready(self):

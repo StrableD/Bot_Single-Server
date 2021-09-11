@@ -1,24 +1,24 @@
 Version 1.0.0 closedAlpha
 
-0xE2 Der Bot hat nun das ELO und Rangsystem integriert. 
-0xE2 Die Datenbank des Bots ist einsatzbereit und benutzbar.
-0xE2 Mehrere Befehle wurden überarbeitet und das Aussehen der Nachrichten wurde großteils verändert.
+• Der Bot hat nun das ELO und Rangsystem integriert. 
+• Die Datenbank des Bots ist einsatzbereit und benutzbar.
+• Mehrere Befehle wurden überarbeitet und das Aussehen der Nachrichten wurde großteils verändert.
 
 Neue Befehle:
-`geisterstimmen`:   Schaltet die Geiterstimmen frei.
-                    Werden nach 5 Minuten automatisch wieder gesperrt.
-`standardKader`:    Hiermit kannst du den Standard-Kader des Bots festlegen.
-                    Er wird aus den auf dem Server angegebenen Standard-Kadern ausgewählt.
-                    Der Standard-Kader wird automatisch für das Spiel ausgewählt, wenn vorher kein anderer ausgewählt wird.
-`elo`:  Gibt die Elo und den Rang des Autors oder des gegebenen Spielers zurück.
-        Nur ein Spielleiter kann die Infos für einen anderen Spieler anfordern.
-        ``players``: Eine Liste an Spielern mit Leerzeichen getrennt (optional)
+`geisterstimmen`: Schaltet die Geiterstimmen frei.
+    Sie werden nach 5 Minuten automatisch wieder gesperrt.
+`standardKader`: Hiermit kannst du den Standard-Kader des Bots festlegen. 
+    Er wird aus den auf dem Server angegebenen Standard-Kadern ausgewählt. 
+    Der Standard-Kader wird automatisch für das Spiel ausgewählt, wenn vorher kein anderer ausgewählt wird.
+`elo`: Gibt die Elo und den Rang des Autors oder des gegebenen Spielers zurück. 
+    Nur ein Spielleiter kann die Infos für einen anderen Spieler anfordern. 
+    ``players``: Eine Liste an Spielern mit Leerzeichen getrennt (optional)
 
 Entfernte Befehle:
 `exit`: Der Bot wird geschlossen und kann nicht wieder gestartet werden.
 
 > Die Befehle des Bots können mit Hilfe des Befehls ``>help`` angezeigt werden. 
-> Wenn der Befehl ``>help`` mit dem Namen eines anderen Befehls ausgeführt wird, dann wird noch mehr Infos zu dem Befehl ausgegeben.
+> Wenn der Befehl ``>help`` mit dem Namen eines der Befehle ausgeführt wird, dann werden noch mehr Infos zu dem Befehl angezeigt.
 
 Bei jeglichen Fragen und Anregungen gerne an den Entwickler wenden.
 

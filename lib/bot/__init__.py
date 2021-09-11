@@ -6,10 +6,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from discord import Guild, Intents
 from discord.channel import DMChannel
+from discord.errors import NotFound
 from discord.ext.commands import Bot, Context
 from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
-from discord.message import Message
+from discord.message import DeletedReferencedMessage, Message
 from lib.bot.constants import BOTPATH, COGS, TOKEN, NoPerms
 from lib.db.db import autosave, getChannelID, updateMembers
 from eventemitter import EventEmitter  # type: ignore
@@ -57,16 +58,18 @@ LOGGING = {
         "err_file":{
             "class": "logging.FileHandler",
             "level": "WARNING",
+            "encoding": "UTF-8",
             "formatter": "error",
-            "filename": f"logs/logs_{date.today()}.log",
+            "filename": f"logs/errors/error_{date.today()}.log",
             "mode": "a"
         },
         "info_file":{
             "class": "logging.FileHandler",
             "level": "INFO",
+            "encoding": "UTF-8",
             "formatter": "info",
             #"filters": ["info_filter"],
-            "filename": f"logs/infos_{date.today()}.log",
+            "filename": f"logs/infos/infos_{date.today()}.log",
             "mode": "a"
         },
         'console': {
@@ -143,7 +146,7 @@ class My_Bot(Bot):
         for cog_name in cogs.keys():
             self.reload_extension("lib.cogs." + cog_name.lower())
         if self.update_date < getmtime(BOTPATH + "/lib/bot/update.txt"):
-            with open(BOTPATH + "/lib/bot/update.txt", "r") as updatefile:
+            with open(BOTPATH + "/lib/bot/update.txt", "r", encoding="UTF-8") as updatefile:
                 updateTxt = updatefile.read()
             self.emitter.emit("bot_update", updateTxt)
             self.update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
@@ -154,7 +157,7 @@ class My_Bot(Bot):
         self.setup()
 
         super().run(TOKEN, reconnect=True)
-        self.logger.info("bot is running...", extra={"command":"run", "author":"func"})
+        self.logger.info("bot crashed...", extra={"command":"run", "author":"func"})
 
     async def process_commands(self, message: Message):
         ctx = await self.get_context(message, cls=Context)
@@ -167,8 +170,12 @@ class My_Bot(Bot):
                 )
             else:
                 await self.invoke(ctx)
-                self.logger.info(f"Es wurde ein Command ausgeführt im Channel {ctx.channel.name}", 
+                self.logger.info(f"Es wurde ein Befehl ausgeführt im Kanal '{ctx.channel.name}'", 
                                  extra={"command":ctx.command, "author":ctx.author.display_name})
+                try:
+                    await ctx.message.delete()
+                except NotFound:
+                    pass
 
     async def process_ghostvoices(self, message: Message):
         if self.ghostvoices:

@@ -1,7 +1,9 @@
+from typing import Optional
+from discord.channel import TextChannel
 from lib.bot import My_Bot
 from pathlib import Path
 
-from discord import Colour, Embed, Guild, Emoji, Member
+from discord import Colour, Embed, Guild, Emoji, Member, embeds
 from discord.ext.commands import Cog, Context, command, has_role
 from discord.utils import get
 from lib.bot.constants import (
@@ -35,7 +37,9 @@ async def updateEmojis(guild: Guild, emojis: list[int]):
 
 
 async def takeSurvey(ctx: Context, theme: str, content: list[tuple]):
-    embed = Embed(title="Bitte auswählen", description=theme, color=Colour.from_rgb(12, 190, 220))
+    embed = Embed(
+        title="Bitte auswählen", description=theme, color=Colour.from_rgb(12, 190, 220)
+    )
     emojiNums = []
     for name, value in content:
         if value.isdigit():
@@ -84,7 +88,9 @@ class Settings(Cog):
 
     async def getNewCadre(self, ctx: Context):
         content = []
-        for channel in ctx.guild.get_channel(getChannelID("default_cadre")).text_channels:
+        for channel in ctx.guild.get_channel(
+            getChannelID("default_cadre")
+        ).text_channels:
             content.append((channel.name, channel.name[:2]))
         cadreSize = await takeSurvey(ctx, "Welche Kadergröße hättest du gerne", content)
 
@@ -130,8 +136,9 @@ class Settings(Cog):
 
         setDefaultCadre(squadDict)
 
-        await ctx.message.delete()
-        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192,192,192))
+        embed = Embed(
+            title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
+        )
         value = ""
         for role, num in squadDict.items():
             value += f"{str(role).title()}: {num}\n"
@@ -154,15 +161,15 @@ class Settings(Cog):
                 "Es ist zur Zeit kein Spielekader ausgewählt. Wenn gespielt wird, wird der Standardkader benutzt.",
                 delete_after=20.0,
             )
-            await ctx.message.delete()
             return
-        
+
         squadDict = await self.getNewCadre(ctx)
 
         setPlayingCadre(squadDict)
 
-        await ctx.message.delete()
-        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192,192,192))
+        embed = Embed(
+            title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
+        )
         value = ""
         for role, num in squadDict.items():
             value += f"{str(role).title()}: {num}\n"
@@ -217,25 +224,99 @@ class Settings(Cog):
         Gibt den aktuellen Kader zurück.
         """
         cadre = getCadre()
-        embed = Embed(title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192,192,192))
+        embed = Embed(
+            title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
+        )
         value = ""
         for role, num in cadre.items():
             value += f"{str(role).title()}: {num}\n"
 
         embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
-        await ctx.message.delete()
-    
+
     @command(name="setRole", aliases=["gibRolle", "role"])
     @has_role(getRoleID("gamemaster"))
     async def setPlayerRole(self, ctx: Context, player: Member, role: MyRoleConverter):
         await player.add_roles(role)
-        await ctx.send(embed = Embed(
-            title = "Rollen des Spielers",
-            description = f"Der Spieler {player.display_name} hat folgende Rollen:",
-            color = Colour.random()
-        ).add_field(name = "Rollen",value = "\n".join(map(lambda x: x.name,player.roles))), delete_after=100.0)
+        await ctx.send(
+            embed=Embed(
+                title="Rollen des Spielers",
+                description=f"Der Spieler {player.display_name} hat folgende Rollen:",
+                color=Colour.random(),
+            ).add_field(
+                name="Rollen", value="\n".join(map(lambda x: x.name, player.roles))
+            ),
+            delete_after=100.0,
+        )
+
+    @command(name="delete", aliases=["lösche", "del"])
+    @has_role(getRoleID("gamemaster"))
+    async def deleteMessages(self, ctx: Context, number: Optional[int] = 1, channel: Optional[TextChannel] = None):
+        """
+        Löscht die angegebene Anzahl an Nachrichten im angegebenen Kanal.
+        ```number```: Die Anzahl der Nachrichten. (optional)
+        ```channel```: Der Kanal, in dem die Nachrichten gelöscht werden sollen. (optional)
+        """
         await ctx.message.delete()
+        
+        if channel == None:
+            channel = ctx.channel
+        async for message in channel.history(limit=number, oldest_first=False):
+            await message.delete()
+
+        await ctx.send(
+            embed=Embed(
+                title="Gelöschte Nachrichten", colour=Colour.teal()
+            ).add_field(name="Anzahl", value=str(number)),
+            delete_after=60.0,
+        )
+
+    @command(name="clear", aliases=["aufräumen", "leeren"])
+    @has_role(getRoleID("gamemaster"))
+    async def clearGameChannels(self, ctx: Context):
+        """
+        Die Kanäle, in denen gespielt wird, werden aufgeräumt.
+        Alle Nachrichten in den Kanälen unterhalb der Kategorie Morbach werden geleert.
+        Ausgenommen sind die Bot-Kanäle
+        """
+        game_category = ctx.guild.get_channel(getChannelID("game_category"))
+        bot_channels = tuple(
+            ctx.guild.get_channel(getChannelID(x))
+            for x in ("bot_channel", "music_channel")
+        )
+        numMsgs = 0
+        
+        msg = await ctx.send("Die Nachrichten werden geslöscht.\nDies kann einen Moment dauern.")
+        
+        for category in filter(
+            lambda c: c.position >= game_category.position, ctx.guild.categories
+        ):
+            for channel in filter(
+                lambda c: type(c) == TextChannel and c not in bot_channels,
+                category.channels,
+            ):
+                async for message in channel.history(oldest_first=True):
+                    await message.delete()
+                    numMsgs += 1
+        loveChannel = ctx.guild.get_channel(getChannelID("lovebirds"))
+        removed_players= []
+        for member in filter(
+            lambda memb: type(memb) == Member and memb != ctx.guild.owner,
+            loveChannel.overwrites,
+        ):
+            await loveChannel.set_permissions(member, overwrite=None)
+            removed_players.append(member.display_name)
+        print(numMsgs)
+        
+        embed=Embed(
+                title="Gelöschte Nachrichten",
+                description="Die Kanäle wurden geleert.",
+                colour=Colour.teal())
+        embed.add_field(name="Anzahl", value=str(numMsgs))
+        if removed_players != []:
+            embed.add_field(name="Liebespaar", value="\n".join(removed_players))
+        await msg.delete()
+        await ctx.send(embed = embed,delete_after=100.0)
 
     async def delEmojis(self, EmojiList: list[Emoji]):
         for emoji in EmojiList:

@@ -122,7 +122,6 @@ class Help(Cog):
             res = await self.bot.wait_for(
                 "message_delete", check=lambda m: m.author.id == self.bot.user.id
             )
-            await ctx.message.delete()
         else:
             if command := find(lambda m: m.name == cmd or cmd in m.aliases, self.bot.commands):
                 if any(check(ctx) for check in command.checks) or command.checks == []:
@@ -132,13 +131,11 @@ class Help(Cog):
                         "Du hast keine Berechtigung diesen Befehl auszuführen.",
                         delete_after=15.0,
                     )
-                await ctx.message.delete()
             else:
                 await ctx.send(
                     f"Den Befehl `{cmd}` gibt es nicht. \nBitte gib den richtigen Befehlsnamen ein, um nähere Infos zu derm Befehl zu bekommen.",
                     delete_after=10.0,
                 )
-                await ctx.message.delete()
 
     @command(name="invite", aliases=["einladen", "in"])
     @check(is_guild_owner)
@@ -158,7 +155,6 @@ class Help(Cog):
             f'{ctx.author.display_name} will dich in die Guilde "{ctx.guild.name}" einladen: \n{invite.url}',
             delete_after=10800.0,
         )
-        await ctx.message.delete()
 
     @invitePlayer.error
     async def invitePlayerError(self, ctx: Context, exc):
@@ -167,7 +163,6 @@ class Help(Cog):
                 f"Du hast keine Berechtigung den Befehl ``{ctx.command.name}`` auszuführen",
                 delete_after=20.0,
             )
-            await ctx.message.delete()
         else:
             raise exc
 
@@ -177,7 +172,6 @@ class Help(Cog):
         self.bot._season_date = date.today()
         resetSeason()
         await ctx.send("""__Die Saison wurde beendet und eine neue angefangen.__\n\nDie gespielten Spiele und die Elo wurden zurückgesetzt""")
-        await ctx.message.delete()
 
     @Cog.listener()
     async def on_ready(self):

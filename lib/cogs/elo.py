@@ -40,7 +40,6 @@ class Elo(Cog):
             )
             await ctx.send(embed=embed, delete_after=45.0)
         elif players != [] and not any(role.id == getRoleID("gamemaster") for role in ctx.author.roles):
-            await ctx.message.delete()
             raise NoPerms(["Adminrechte"])
         elif players != [] and all(elo := tuple(getElo(player.id) for player in players)):
             embed = Embed(title="ELO Info", colour=Colour.from_rgb(154,7,125))
@@ -84,7 +83,6 @@ class Elo(Cog):
                 inline=True,
             )
             await ctx.send(embed=embed, delete_after=45.0)
-        await ctx.message.delete()
 
     @getPlayerElo.error
     async def getPlayerEloError(self, ctx: Context, exc):

@@ -1,10 +1,13 @@
-Version 1.0.0 closedAlpha
+__Version 1.0.0 closedAlpha__
+
+*Anm: Die Befehle funktionieren soweit, aber es kann noch zu Komplikationen führen. 
+Es wird alles zu späteren Auswertung protkolliert, aber sollte ein Problem auftreten, dann könnt ihr einfach <@!312644293602836482> anschreiben.*
 
 \> Der Bot hat nun das ELO und Rangsystem integriert. 
 \> Die Datenbank des Bots ist einsatzbereit und benutzbar.
 \> Mehrere Befehle wurden überarbeitet und das Aussehen der Nachrichten wurde großteils verändert.
 
-Neue Befehle:
+**Neue Befehle:**
 `geisterstimmen`: Schaltet die Geiterstimmen frei.
     Sie werden nach 5 Minuten automatisch wieder gesperrt.
 `standardKader`: Hiermit kannst du den Standard-Kader des Bots festlegen. 
@@ -14,14 +17,14 @@ Neue Befehle:
     Nur ein Spielleiter kann die Infos für einen anderen Spieler anfordern. 
     ``players``: Eine Liste an Spielern mit Leerzeichen getrennt (optional)
 
-Entfernte Befehle:
+**Entfernte Befehle:**
 `exit`: Der Bot wird geschlossen und kann nicht wieder gestartet werden.
 
-> Die Befehle des Bots können mit Hilfe des Befehls ``>help`` angezeigt werden. 
-> Wenn der Befehl ``>help`` mit dem Namen eines der Befehle ausgeführt wird, dann werden noch mehr Infos zu dem Befehl angezeigt.
+> Die Befehle des Bots könnt ihr mit dem Befehl ``>help`` angezeigen lassen. 
+> Wenn ihr den Befehl ``>help`` mit dem Namen eines der Befehle ausführen lasst, dann wird euch noch mehr Info zu dem Befehl angezeigt.
 
-Bei jeglichen Fragen und Anregungen gerne an den Entwickler wenden.
+Bei jeglichen Fragen und Anregungen könnt ihr euch gerne an den Entwickler wenden.
 
 MfG,
 Der Entwickler 
-<@312644293602836482>
+<@!312644293602836482>

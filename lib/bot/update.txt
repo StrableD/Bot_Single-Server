@@ -1,8 +1,8 @@
 Version 1.0.0 closedAlpha
 
-• Der Bot hat nun das ELO und Rangsystem integriert. 
-• Die Datenbank des Bots ist einsatzbereit und benutzbar.
-• Mehrere Befehle wurden überarbeitet und das Aussehen der Nachrichten wurde großteils verändert.
+\> Der Bot hat nun das ELO und Rangsystem integriert. 
+\> Die Datenbank des Bots ist einsatzbereit und benutzbar.
+\> Mehrere Befehle wurden überarbeitet und das Aussehen der Nachrichten wurde großteils verändert.
 
 Neue Befehle:
 `geisterstimmen`: Schaltet die Geiterstimmen frei.

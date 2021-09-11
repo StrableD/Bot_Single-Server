@@ -60,7 +60,7 @@ LOGGING = {
             "level": "WARNING",
             "encoding": "UTF-8",
             "formatter": "error",
-            "filename": f"logs/errors/error_{date.today()}.log",
+            "filename": BOTPATH+f"logs/errors/error_{date.today()}.log",
             "mode": "a"
         },
         "info_file":{
@@ -69,7 +69,7 @@ LOGGING = {
             "encoding": "UTF-8",
             "formatter": "info",
             #"filters": ["info_filter"],
-            "filename": f"logs/infos/infos_{date.today()}.log",
+            "filename": BOTPATH+f"logs/infos/infos_{date.today()}.log",
             "mode": "a"
         },
         'console': {

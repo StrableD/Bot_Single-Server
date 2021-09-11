@@ -1,7 +1,9 @@
 __Version 1.0.0 closedAlpha__
 
-*Anm: Die Befehle funktionieren soweit, aber es kann noch zu Komplikationen führen. 
-Es wird alles zu späteren Auswertung protkolliert, aber sollte ein Problem auftreten, dann könnt ihr einfach <@!312644293602836482> anschreiben.*
+<@&768494431136645127>
+
+*Anm: Die Befehle sollten soweit funktionieren, es kann jedoch trotzdem zu Komplikationen kommen. 
+Sollte ein Problem auftreten, dann könnt ihr einfach <@!312644293602836482> anschreiben.*
 
 \> Der Bot hat nun das ELO und Rangsystem integriert. 
 \> Die Datenbank des Bots ist einsatzbereit und benutzbar.

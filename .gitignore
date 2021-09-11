@@ -1,6 +1,5 @@
 /.vscode
 **/__pycache__
-logs/
 **/database.db
 **/blueprints
 **/*.log

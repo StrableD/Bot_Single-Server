@@ -1,6 +1,5 @@
 from datetime import date
 
-from discord.mentions import AllowedMentions
 from lib.bot.constants import BOTPATH
 from os.path import getmtime
 from typing import Optional, get_args

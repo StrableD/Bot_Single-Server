@@ -1,9 +1,10 @@
 from datetime import date, datetime, timedelta
+from lib.cogs.help import is_guild_owner
 from typing import Optional
 
 from apscheduler.triggers.date import DateTrigger
 from discord import Colour, Embed, Guild, Member, Role
-from discord.ext.commands import Bot, Cog, Context, command
+from discord.ext.commands import Bot, Cog, Context, command, check
 from discord.ext.commands.core import has_role
 from lib.bot import My_Bot
 from lib.bot.constants import (
@@ -37,7 +38,7 @@ class Game(Cog):
     @staticmethod
     def getSquad(players: list) -> dict[str, str]:
         returnDict = {}
-        length = Game.cadreLength
+        length = len(players)
         for player in players:
             rand = randint(length)
             while rand in returnDict.values():
@@ -111,7 +112,7 @@ class Game(Cog):
             )
             embed.add_field(
                 name="Anzahl fehlender Spieler",
-                value=self.cadreLength() - len(playerList),
+                value=self.cadreLength - len(playerList),
             )
             embed.add_field(
                 name="Mögliche Lösungen",
@@ -166,7 +167,7 @@ class Game(Cog):
                 "Alle Spieler sind im Sprachkanal und das Spiel kann beginnen",
                 delete_after=60.0,
             )
-            self._currentgamemaster = ctx.author
+            self.bot._current_gamemaster = ctx.author
 
     @command(name="dead", aliases=["tot"])
     @has_role(getRoleID("gamemaster"))
@@ -181,10 +182,10 @@ class Game(Cog):
         if player == None:
             livingPlayers = list(
                 map(
-                    lambda x, y: (x, gameCadre.keys().index(x))
-                    if not y["dead"]
+                    lambda x: (x[0], gameCadre.keys().index(x[0]))
+                    if not x[1]["dead"]
                     else None,
-                    gameCadre
+                    gameCadre.items()
                 )
             ).remove(None)
             playerNum = await takeSurvey(
@@ -194,6 +195,7 @@ class Game(Cog):
         for role in player.roles:
             if self.checkRolePos(role, ctx.guild) and role.id != 768494431136645127:
                 await player.remove_roles(role)
+                await player.edit(mute=True)
         await player.add_roles(ctx.guild.get_role(getRoleID("dead")))
         #Der zwischengespeicherte Spielekader wird akktualisiert
         gameCadre[player]["dead"] = True
@@ -224,10 +226,10 @@ class Game(Cog):
         if player == None:
             livingPlayers = list(
                 map(
-                    lambda x, y: (x, gameCadre.keys().index(x))
-                    if not y["dead"]
+                    lambda x: (x[0], gameCadre.keys().index(x[0]))
+                    if not x[1]["dead"]
                     else None,
-                    gameCadre,
+                    gameCadre.items(),
                 )
             ).remove(None)
             playerNum = await takeSurvey(
@@ -280,11 +282,11 @@ class Game(Cog):
             )
             resultCadre[player.display_name] = value
         winner = "Niemand"
-        if any(lovebirds := filter(lambda n: n[1]["lovebirds"], gameCadre.items())):
+        if any(lovebirds := dict(filter(lambda n: n[1]["lovebirds"], gameCadre.items()))):
             teams = [getRoleTeam(value["role"]) for value in lovebirds.values()]
-            if not teams.count(2):
+            if not teams.count(2) and all(not bird["dead"] for bird in lovebirds):
                 winner = "Liebespaar"
-        else:
+        elif winner == "Niemand":
             livingTeams = set()
             for value in gameCadre.values():
                 role, dead, captain, lovebirds = value.values()
@@ -316,15 +318,15 @@ class Game(Cog):
             numRound=self.bot._roundNum,
             maxPlayer=maxPlayers,
             numPlayer=len(gameCadre),
-            gamemaster=self.bot._current_gamemaster.mention(),
-            playerDict="\n".join(map(lambda x, y: f"{x}: {y}", resultCadre)),
+            gamemaster=self.bot._current_gamemaster.mention,
+            playerDict="\n".join(map(lambda x: f"{x[0].removeprefix('♰')}: {x[1]}", resultCadre.items())),
             lovebird=",".join(
                 map(
-                    lambda m: m[0].display_name,
-                    filter(lambda x: x[1]["liebespaar"], gameCadre.items()),
+                    lambda m: m[0].display_name.removeprefix('♰'),
+                    filter(lambda x: x[1]["lovebirds"], gameCadre.items()),
                 )
             )
-            if any(filter(lambda x: x[1]["liebespaar"], gameCadre.items))
+            if any(filter(lambda x: x[1]["lovebirds"], gameCadre.items()))
             else "Nein",
             winner=winner,
         )
@@ -333,9 +335,13 @@ class Game(Cog):
         self.bot._current_gamemaster = None
         self.bot._lastRound = date.today()
         self.bot.ghostvoices = False
+        await ctx.invoke(self.removeLovebirds)
         for player in gameCadre:
             nick:str = player.display_name
+            player.remove_roles((filter(lambda x: x.id != getRoleID("gamemaster"), player.roles)))
             await player.edit(nick=nick.removeprefix("♰"))
+            if player.voice != None:
+                await player.edit(mute=False)
         setCurrentGameCadre({})
 
     @command(name="next", aliases=["moveon", "weiter"], enabled=False, hidden=True)
@@ -418,6 +424,12 @@ class Game(Cog):
             self.resetGhostvoices(), DateTrigger(del_time, del_time.tzinfo)
         )
 
+    @command(name="setGamemaster", aliases=["sG"])
+    @check(is_guild_owner)
+    async def setGamemaster(self, ctx: Context, player: Member):
+        self.bot._current_gamemaster = player
+        await ctx.send(f"{player.mention} ist nun Spielleiter")
+    
     def resetGhostvoices(self):
         self.bot.ghostvoices = False
 

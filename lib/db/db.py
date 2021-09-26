@@ -81,14 +81,16 @@ def getRoleTeam(bot_name: str)->str:
     else:
         return data[0]
 
-def getElo(player_id: int)->int:
+def getElo(player_id: int):
     data = getData("players", ("Elo"), ("PlayerID", player_id))
-    if data == None or type(data[0]) != int:
+    if data == None:
+        return bool(None)
+    elif type(data[0]) != int:
         raise DataError
     elif len(data) != 1 :
         raise DatabaseError
     else:
-        return data[0]
+        return int(data[0])
 
 def setPlayerElo(player_id: int, new_elo: int):
     if not setData("players", ("Elo"), (new_elo), f"PlayerID = {player_id}"):

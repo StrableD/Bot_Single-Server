@@ -1,4 +1,5 @@
 import json
+from random import choice
 from numpy import average, e
 from lib.bot.constants import BONI, NoPerms, getCurrentGameCadre
 from lib.db.db import (
@@ -29,13 +30,14 @@ class Elo(Cog):
         leagues = getLeagues()
         if players == [] and (elo := getElo(ctx.author.id)) != None:
             embed = Embed(title="ELO Info", colour=Colour.from_rgb(154,7,125))
+            embed.set_thumbnail(url=ctx.author.avatar_url)
             league = ""
             for name, range in leagues.items():
                 if elo >= range[0] and elo <= range[1]:
                     league = name
             embed.add_field(
                 name=ctx.author.display_name,
-                value=f"Die ELO beträgt {elo}\nDaraus folgt der Rang {league}",
+                value=f"Die ELO beträgt {elo}\nDaraus folgt der Rang **{league}**",
                 inline=True,
             )
             await ctx.send(embed=embed, delete_after=45.0)
@@ -43,6 +45,7 @@ class Elo(Cog):
             raise NoPerms(["Adminrechte"])
         elif players != [] and all(elo := tuple(getElo(player.id) for player in players)):
             embed = Embed(title="ELO Info", colour=Colour.from_rgb(154,7,125))
+            embed.set_thumbnail(url=choice(players).avatar_url)
             fields = []
             for player in players:
                 league = ""
@@ -65,7 +68,7 @@ class Elo(Cog):
             player = ctx.author if players == [] else players
             embed = Embed(
                 title="Es gibt keine ELO Info",
-                description="Grund: Bisher nicht implementiert oder du hast einfach keine ^^",
+                description="Grund: Bisher nicht implementiert oder du hast einfach keine ^^. \nBitte versuche es mit einer anderen Anfrage",
                 colour=Colour.from_rgb(255,0,0),
             )
             player_without = []

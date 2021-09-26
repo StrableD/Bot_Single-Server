@@ -158,7 +158,7 @@ class Settings(Cog):
         if clear:
             setPlayingCadre({})
             await ctx.send(
-                "Es ist zur Zeit kein Spielekader ausgewählt. Wenn gespielt wird, wird der Standardkader benutzt.",
+                "Der bisher ausgewählte Spielekader wurde gelöscht. Wenn gespielt wird, wird der Standardkader benutzt.",
                 delete_after=20.0,
             )
             return
@@ -206,7 +206,7 @@ class Settings(Cog):
         cadre = getCadre()
         if "dorfbewohner" in cadre:
             cadre["dorfbewohner"] -= 1
-            if cadre["dorfbewohner"] < 1:
+            if cadre["dorfbewohner"] == 0:
                 del cadre["dorfbewohner"]
                 await ctx.send(
                     "Jetzt gibt es keine Dorfbewohner mehr im aktuellen Kader!",
@@ -216,6 +216,7 @@ class Settings(Cog):
             await ctx.send(
                 "Es gibt keine Dorfbewohner mehr im aktuellen Kader!", delete_after=20.0
             )
+        setPlayingCadre(cadre)
         await self.returnCadre(ctx)
 
     @command(name="cadre", aliases=["kader"])
@@ -295,9 +296,10 @@ class Settings(Cog):
                 lambda c: type(c) == TextChannel and c not in bot_channels,
                 category.channels,
             ):
-                async for message in channel.history(oldest_first=True):
-                    await message.delete()
-                    numMsgs += 1
+                while (history := await channel.history(oldest_first=True, limit=50).flatten()) != []:
+                    for message in history:
+                        await message.delete()
+                        numMsgs += 1
         loveChannel = ctx.guild.get_channel(getChannelID("lovebirds"))
         removed_players= []
         for member in filter(
@@ -306,7 +308,6 @@ class Settings(Cog):
         ):
             await loveChannel.set_permissions(member, overwrite=None)
             removed_players.append(member.display_name)
-        print(numMsgs)
         
         embed=Embed(
                 title="Gelöschte Nachrichten",

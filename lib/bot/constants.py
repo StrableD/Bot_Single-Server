@@ -9,7 +9,7 @@ from pathlib import PurePath
 from sqlite3 import connect
 from typing import Union
 
-from discord import Member
+from discord.member import Member
 from discord.ext.commands.converter import RoleConverter
 from discord.ext.commands.errors import CheckFailure, RoleNotFound
 
@@ -30,6 +30,7 @@ Spieler: {numPlayer}
 Spielleitung: {gamemaster}
 
 {playerDict}
+
 Liebespaar: {lovebird}
 Gewinner: {winner}"""
 
@@ -147,9 +148,72 @@ BONI = {"weißer-werwolf": 0.5,
         "seherin": 0.05
         }
 
+class MyGuild:
+    def __init__(self):
+        self._guild=None
+    
+    @property
+    def guild(self):
+        return self._guild
+
+    @guild.setter
+    def guild(self, guild):
+        print(guild)
+        self._guild = guild
+
+myGuild = MyGuild()
+
+
+def member_to_json(json_dict):
+    def lookForMember(jsonDict):
+        org_dict = jsonDict.copy()
+        for key, value in org_dict.items():
+            if type(value) == dict:
+                jsonDict[key] = lookForMember(value)
+            if type(key) == Member:
+                res = jsonDict.pop(key)
+                key = f"<MemberID={key.id}"
+                jsonDict[key] = res
+            elif type(value) == Member:
+                jsonDict[key] = f"<MemberID={value.id}"
+        return jsonDict
+    return lookForMember(json_dict)
+
+class MemberJsonDecoder(json.JSONDecoder):
+    def __init__(self,*args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+    def object_hook(self, json_dict):
+        def lookForMember(jsonDict):
+            org_dict = jsonDict.copy()
+            for key, value in org_dict.items():
+                if type(value) == dict:
+                    jsonDict[key] = lookForMember(value)
+                if str(key).startswith("<MemberID="):
+                    res = jsonDict.pop(key)
+                    key = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
+                    jsonDict[key] = res
+                elif str(value).startswith("<MemberID="):
+                    jsonDict[key] = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
+            return jsonDict
+        return lookForMember(json_dict)
+    """ def raw_decode(self, s: str):
+        decodedObject = super().decode(s)
+        def lookForMember(jsonDict):
+            for key, value in jsonDict.items():
+                if type(value) == dict:
+                    jsonDict[key] = lookForMember(value)
+                elif str(key).startswith("<MemberID="):
+                    res = jsonDict.pop(key)
+                    key = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
+                    jsonDict[key] = res
+                elif str(value).startswith("<MemberID="):
+                    jsonDict[key] = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
+            return jsonDict
+        return lookForMember(decodedObject) """
+
 def getCadre() -> dict[str, int]:
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:
-        cadres = json.load(cadreFile)
+        cadres = json.load(cadreFile, cls=MemberJsonDecoder)
     if cadres["playing"] == {}:
         return cadres["default"]
     else:
@@ -158,19 +222,21 @@ def getCadre() -> dict[str, int]:
 
 def setDefaultCadre(cadre: dict):
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:
-        currentCadres = json.load(cadreFile)
+        currentCadres = json.load(cadreFile, cls=MemberJsonDecoder)
     currentCadres["default"] = cadre
+    dumpCadre = member_to_json(currentCadres)
     with open(BOTPATH + "/data/cadres.json", "w") as cadreFile:
-        json.dump(currentCadres, cadreFile)
+        cadreFile.write(json.dumps(dumpCadre))
     return True
 
 
 def setPlayingCadre(cadre: dict):
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:
-        currentCadres = json.load(cadreFile)
+        currentCadres = json.load(cadreFile, cls=MemberJsonDecoder)
     currentCadres["playing"] = cadre
+    dumpCadre = member_to_json(currentCadres)
     with open(BOTPATH + "/data/cadres.json", "w") as cadreFile:
-        json.dump(currentCadres, cadreFile)
+        cadreFile.write(json.dumps(dumpCadre))
     return True
 
 
@@ -181,14 +247,15 @@ def getCurrentGameCadre() -> dict[Member, dict[str, Union[bool, str]]]:
     Spieler: `Member`, Role: `str`, tot: `bool`, Hauptmann: `bool`, Liebespaar: `bool`
     """
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:
-        cadres = json.load(cadreFile)
+        cadres = json.load(cadreFile, cls=MemberJsonDecoder)
     return cadres["currentgame"]
 
 
 def setCurrentGameCadre(cadre: dict):
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:
-        currentCadres = json.load(cadreFile)
+        currentCadres = json.load(cadreFile, cls=MemberJsonDecoder)
     currentCadres["currentgame"] = cadre
+    dumpCadre = member_to_json(currentCadres)
     with open(BOTPATH + "/data/cadres.json", "w") as cadreFile:
-        json.dump(currentCadres, cadreFile)
+        cadreFile.write(json.dumps(dumpCadre))
     return True

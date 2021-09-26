@@ -1,5 +1,6 @@
 from asyncio.tasks import sleep
 from datetime import date
+import json
 from os.path import getmtime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -11,7 +12,7 @@ from discord.ext.commands import Bot, Context
 from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
 from discord.message import Message
-from lib.bot.constants import BOTPATH, COGS, TOKEN, NoPerms
+from lib.bot.constants import BOTPATH, COGS, TOKEN, myGuild, NoPerms
 from lib.db.db import autosave, getChannelID, updateMembers
 from eventemitter import EventEmitter  # type: ignore
 import logging
@@ -60,7 +61,7 @@ LOGGING = {
             "level": "WARNING",
             "encoding": "UTF-8",
             "formatter": "error",
-            "filename": BOTPATH+f"logs/errors/error_{date.today()}.log",
+            "filename": BOTPATH+f"/logs/errors/error_{date.today()}.log",
             "mode": "a"
         },
         "info_file":{
@@ -69,7 +70,7 @@ LOGGING = {
             "encoding": "UTF-8",
             "formatter": "info",
             #"filters": ["info_filter"],
-            "filename": BOTPATH+f"logs/infos/infos_{date.today()}.log",
+            "filename": BOTPATH+f"/logs/infos/infos_{date.today()}.log",
             "mode": "a"
         },
         'console': {
@@ -217,6 +218,7 @@ class My_Bot(Bot):
     async def on_ready(self):
         if not self.ready:
             self.guild = self.get_guild(768494431124586546)
+            myGuild.guild = self.guild
             self.scheduler.start()
             self.scheduler.add_job(
                 self.update_bot, CronTrigger(day_of_week=3, hour=5, minute=0, second=0)

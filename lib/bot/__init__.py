@@ -1,6 +1,6 @@
 from asyncio.tasks import sleep
 from datetime import date
-import json
+import toml
 from os.path import getmtime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -12,7 +12,7 @@ from discord.ext.commands import Bot, Context
 from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
 from discord.message import Message
-from lib.bot.constants import BOTPATH, COGS, TOKEN, myGuild, NoPerms
+from lib.bot.constants import BOTPATH, COGS, TOKEN, MemberJsonDecoder, member_to_json, myGuild, NoPerms
 from lib.db.db import autosave, getChannelID, updateMembers
 from eventemitter import EventEmitter  # type: ignore
 import logging
@@ -109,14 +109,14 @@ class My_Bot(Bot):
         self.prefix = ">"
         self.ready = False
         self.cogs_ready = Ready()
-        self.update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
+        self._update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
 
         self.guild: Guild = None
         self.scheduler = AsyncIOScheduler()
         self.emitter = EventEmitter()
         self.logger = logging.getLogger("Error_Logger")
 
-        self.ghostvoices = False
+        self._ghostvoices = False
         self._season_date = date.today()
         self._current_gamemaster = None
         self._lastRound = date(1999, 1, 1)
@@ -146,18 +146,20 @@ class My_Bot(Bot):
         cogs = self.cogs.copy()
         for cog_name in cogs.keys():
             self.reload_extension("lib.cogs." + cog_name.lower())
-        if self.update_date < getmtime(BOTPATH + "/lib/bot/update.txt"):
+        if self._update_date < getmtime(BOTPATH + "/lib/bot/update.txt"):
             with open(BOTPATH + "/lib/bot/update.txt", "r", encoding="utf-8") as updatefile:
                 updateTxt = updatefile.read()
             self.emitter.emit("bot_update", updateTxt)
-            self.update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
+            self._update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
         updateMembers(list(filter(lambda x: not x.bot, self.guild.members)))
+        self.update_json_attr()
 
     def run(self):
         self.logger.info("running setup...", extra={"command":"run", "author":"func"})
         self.setup()
 
         super().run(TOKEN, reconnect=True)
+        self.update_json_attr()
         self.logger.info("bot crashed...", extra={"command":"run", "author":"func"})
 
     async def process_commands(self, message: Message):
@@ -179,7 +181,7 @@ class My_Bot(Bot):
                     pass
 
     async def process_ghostvoices(self, message: Message):
-        if self.ghostvoices:
+        if self._ghostvoices:
             channel = self.get_channel(getChannelID("ghostvoices"))
             msg = f"Von {message.author.display_name}: \n"
             msg += f'"{message.content}"'
@@ -191,9 +193,11 @@ class My_Bot(Bot):
 
     async def on_connect(self):
         self.logger.info("bot connected", extra={"command":"on_connect", "author":"func"})
+        self.update_bot_attr()
 
     async def on_disconnect(self):
         self.logger.info("bot disconnected", extra={"command":"on_disconnect", "author":"func"})
+        self.update_json_attr()
 
     async def on_error(self, err, *args):
         if err == "on_command_error" and args[0].command.name not in ("invite", "elo", "chronicle"):
@@ -242,5 +246,24 @@ class My_Bot(Bot):
                 await self.process_commands(message)
             elif isinstance(message.channel, DMChannel):
                 await self.process_ghostvoices(message)
+    
+    def update_json_attr(self):
+        attr_dir = self.__dir__()
+        attr_dir = attr_dir[:attr_dir.index("all_commands")]
+        attr_dir = list(filter(lambda x: x.startswith("_"), attr_dir))
+        with open(BOTPATH+"/data/bot_attributes.toml", "r") as attr_file:
+            attr_dict = toml.load(attr_file)
+        for attr in attr_dir:
+            attr_dict["attributes"][attr] = self.__getattribute__(attr)
+        attr_dict = member_to_json(attr_dict)
+        with open(BOTPATH+"/data/bot_attributes.toml", "w") as attr_file:
+            toml.dump(attr_dict, attr_file)
+    
+    def update_bot_attr(self):
+        with open(BOTPATH+"/data/bot_attributes.toml", "r") as attr_file:
+            attr_dict = toml.load(attr_file)
+        attr_dict = MemberJsonDecoder().object_hook(attr_dict["attributes"])
+        for attr, value in attr_dict.items():
+            self.__setattr__(attr, value)
  
 bot = My_Bot()

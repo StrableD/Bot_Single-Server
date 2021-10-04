@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 from lib.cogs.help import is_guild_owner
-from typing import Optional
+from typing import Optional, Union
 
 from apscheduler.triggers.date import DateTrigger
 from discord import Colour, Embed, Guild, Member, Role
@@ -15,13 +15,13 @@ from lib.bot.constants import (
     setCurrentGameCadre,
 )
 from lib.cogs.settings import takeSurvey
-from lib.db.db import getChannelID, getElo, getRoleID, getRoleTeam 
+from lib.db.db import getChannelID, getElo, getRoleID, getRoleTeam, saveCurrentGame 
 from numpy.random import randint
 
 
 class Game(Cog):
     """
-    Das Modul, welches die Funktionen zum Spielen hinzufügt
+    Das Modul, welches die Funktionen zum Spielen hinzufügt.
     """
 
     def __init__(self, bot: My_Bot):
@@ -167,6 +167,7 @@ class Game(Cog):
                 "Alle Spieler sind im Sprachkanal und das Spiel kann beginnen",
                 delete_after=60.0,
             )
+            self.bot.emitter.emit("newGame")
             self.bot._current_gamemaster = ctx.author
 
     @command(name="dead", aliases=["tot"])
@@ -331,28 +332,19 @@ class Game(Cog):
             winner=winner,
         )
         await ctx.guild.get_channel(getChannelID("chronicle")).send(msg)
-        self.bot.emitter.emit("calcElo", winner)
+        gameNumber = saveCurrentGame(gameCadre, winner)
+        self.bot.emitter.emit("calcElo", gameNumber)
         self.bot._current_gamemaster = None
         self.bot._lastRound = date.today()
-        self.bot.ghostvoices = False
+        self.bot._ghostvoices = False
         await ctx.invoke(self.removeLovebirds)
         for player in gameCadre:
             nick:str = player.display_name
-            player.remove_roles((filter(lambda x: x.id != getRoleID("gamemaster"), player.roles)))
             await player.edit(nick=nick.removeprefix("♰"))
+            await player.remove_roles((filter(lambda x: x.id != getRoleID("gamemaster"), player.roles)))
             if player.voice != None:
                 await player.edit(mute=False)
         setCurrentGameCadre({})
-
-    @command(name="next", aliases=["moveon", "weiter"], enabled=False, hidden=True)
-    @has_role(getRoleID("gamemaster"))
-    async def nextMove(self, ctx: Context):
-        """
-        Der Zug ist abgeschlossen und der nächste Zug kommt dran.
-        Es wird nach der Reihenfolge vorgegangen und den Spielern, die gerade dran sind eine Nachricht geschickt.
-        Es soll den Spielleiter unterstützen, muss aber nicht genutzt werden.
-        """
-        pass
 
     @command(name="love", aliases=["liebe", "liebende"])
     @has_role(getRoleID("gamemaster"))
@@ -418,20 +410,63 @@ class Game(Cog):
         Schaltet die Geiterstimmen frei.
         Werden nach 5 Minuten automatisch wieder gesperrt.
         """
-        self.bot.ghostvoices = True
+        self.bot._ghostvoices = True
         del_time = datetime.now() + timedelta(minutes=5.0)
         self.bot.scheduler.add_job(
             self.resetGhostvoices(), DateTrigger(del_time, del_time.tzinfo)
         )
+    
+    @command(name="reset", aliases=["resette", "restart"])
+    @has_role(getRoleID("gamemaster"))
+    async def resetRole(self, ctx: Context, player: Union[Member, str]):
+        """
+        Setzt den Spieler zum Stand am Anfang der Runde zurück.
+        Wenn ein "all" hinzugefügt wird, dann wird die ganze Runde (alle Spieler) auf den Start der Runde zurückgesetzt.
+        ``player``: Der Spieler, dessen Rolle zurückgesetzt werden soll, oder alle
+        Möglichkeiten für ``player``: <ein Spieler>, 'all', 'alle', 'jeden'
+        """
+        if type(player) == str:
+            if player.lower not in ("all", "alle", "jeden"):
+                await ctx.send("""\tGibt bitte einen Spieler ein um diesen zurückzusetzen.
+\tOder gibt eine der folgenden Möglichkeiten ein um das Spiel erneut zu starten: 'all', 'alle', 'jeden'""",
+                               delete_after=20.0)
+        cadre = getCurrentGameCadre()
+        res_cadre = cadre.copy()
+        if type(player) == str:
+            title = "Das Spiel wurde zurückgesetzt"
+            for ply, attrs in cadre.items():
+                for attr, value in attrs.items():
+                    if type(value) == bool:
+                        res_cadre[ply][attr] = not value
+                for role in ply.roles:
+                    if self.checkRolePos(role, ctx.guild):
+                        await player.remove_roles(role)
+                await player.add_roles(ctx.guild.get_role(getRoleID(attr["role"])))
+        else:
+            title = "Der Spieler wurde zurückgesetzt"
+            for attr, value in cadre[player].items():
+                if type(value) == bool:
+                    res_cadre[player][attr] = not value
+            for role in player.roles:
+                if self.checkRolePos(role, ctx.guild):
+                    await player.remove_roles(role)
+                await player.add_roles(ctx.guild.get_role(getRoleID(cadre[player]["role"])))
+        setCurrentGameCadre(res_cadre)
+        embed = Embed(title=title,
+                      description="Das Spiel sieht jetzt wie folgt aus:",
+                      color=Colour.from_rgb(255,0,120))
+        value = "\n".join(map(lambda m: f"{m[0].display_name}: {m[1]['role'].upper()}", res_cadre.items()))
+        embed.add_field(name="Kader",value=value)
+        await ctx.send(embed=embed, delete_after=60.0)
 
-    @command(name="setGamemaster", aliases=["sG"])
+    @command(name="setGamemaster", aliases=["sG"], hidden=True)
     @check(is_guild_owner)
     async def setGamemaster(self, ctx: Context, player: Member):
         self.bot._current_gamemaster = player
         await ctx.send(f"{player.mention} ist nun Spielleiter")
     
     def resetGhostvoices(self):
-        self.bot.ghostvoices = False
+        self.bot._ghostvoices = False
 
     @Cog.listener()
     async def on_ready(self):

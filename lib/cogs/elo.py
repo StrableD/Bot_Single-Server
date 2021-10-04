@@ -1,14 +1,21 @@
 import json
+
+from discord.ext.commands import check
+from lib.bot import My_Bot
 from random import choice
 from numpy import average, e
-from lib.bot.constants import BONI, NoPerms, getCurrentGameCadre
+from lib.bot.constants import BONI, NoPerms
+from lib.cogs.help import is_guild_owner
 from lib.db.db import (
     getElo,
+    getGameToEvaluate,
     getRoleID,
     getRoleTeam,
     getData,
     getLeagues,
+    getUnevaluatedGames,
     setData,
+    setGameToIsEvaluate,
     setPlayerElo
 )
 from discord import Embed, Member, Colour
@@ -16,10 +23,26 @@ from discord.ext.commands import Cog, command, Greedy, Context
 
 
 class Elo(Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: My_Bot):
         self.bot = bot
+        self.__elo_calculated = False
+                
+        #emitter
         self.bot.emitter.on("calcElo", self.calculateElo)
+        self.bot.emitter.on("newGame", self.set_calculated_to_false)
+        
+    @property
+    def elo_calculated(self):
+        return self.__elo_calculated
 
+    @elo_calculated.setter
+    def elo_calculated(self, value: bool):
+        if type(value) == bool:
+            self.__elo_calculated = value
+
+    def set_calculated_to_false(self):
+        self.elo_calculated = False
+    
     @command(name="elo")
     async def getPlayerElo(self, ctx: Context, players: Greedy[Member]):
         """
@@ -40,7 +63,8 @@ class Elo(Cog):
                 value=f"Die ELO beträgt {elo}\nDaraus folgt der Rang **{league}**",
                 inline=True,
             )
-            await ctx.send(embed=embed, delete_after=45.0)
+            embed.add_field(name="**Server**", value=ctx.guild.name, inline=False)
+            await ctx.author.send(embed=embed, delete_after=45.0)
         elif players != [] and not any(role.id == getRoleID("gamemaster") for role in ctx.author.roles):
             raise NoPerms(["Adminrechte"])
         elif players != [] and all(elo := tuple(getElo(player.id) for player in players)):
@@ -163,22 +187,49 @@ class Elo(Cog):
         winDict = json.dumps(winDict)
         setData("players", columns, (compGames,compWin,seasGames,seasWin,winDict), f"PlayerID = {player.id}")
 
-    async def calculateElo(self, winner: str):
+    async def calculateElo(self, gameNumber: int):
         """Die Elo der Spieler wird hier am Ende eines Spieles berechnet und gespeichert"""
-        game = getCurrentGameCadre()
+        if self.elo_calculated:
+            return
+        game = getGameToEvaluate(gameNumber)
+        winner = game.pop("winner")
         for player in game:
-            game[player]["elo"] = getElo(player.id)
             game[player]["team"] = getRoleTeam(game[player]["role"])
         for player in game:
             won = game[player]["team"] == winner
             self.increaseGames(player, game[player]["role"], won)
-            if getData("players", ("PlayedGameSeason"), ("PlayerID", player.id))[0] <= 6:
+            if getData("players", ("PlayedGameSeason",), ("PlayerID", player.id))[0] <= 6:
                 self.doRank(player)
             else:
                 eloDiff = self.getELoDiff(player,game, int(won))
                 newElo = game[player]["elo"]+ eloDiff
                 setPlayerElo(player.id, newElo)
-            
+        setGameToIsEvaluate(gameNumber)
+        self.elo_calculated = True
+    
+    @command(name="calcAllElo", aliases=["werteAlleAus", "waa","cae"])
+    @check(is_guild_owner)
+    async def calculateAllElo(self, ctx: Context):
+        """
+        Mit diesem Befehl können alle nicht ausgewerteten Spiele ausgewerted werden.
+        """
+        members = set()
+        gameNums = getUnevaluatedGames()
+        for gameNum in gameNums:
+            self.elo_calculated = False
+            game = [getGameToEvaluate(gameNum).keys()].remove("winner")
+            members.update(game)
+            await self.calculateElo(gameNum)
+        
+        embed = Embed(title="Elo ausgewerted",
+                      desciption="Die Elo der noch nicht ausgewerteten Spiele wurde berechnet",
+                      colour=Colour.form_rgb(0,0,0))
+        embed.add_field(name="Anzahl ausgewerteter Spiele", value=sum(gameNums))
+        embed.add_field(name="Von diesen Spielern wurde die Elo geändert",
+                        value="\n".join(map(lambda x: x.display_name if members.index(x) % 2 != 0 else f"\t{x.display_name}", members)),
+                        inline=False)
+        await ctx.send(embed=embed, delete_after=100.0)
+        
 
     @Cog.listener()
     async def on_ready(self):

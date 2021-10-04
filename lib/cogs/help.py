@@ -179,11 +179,11 @@ class Help(Cog):
     @command(name="update")
     @check(lambda ctx: ctx.author.id == ctx.bot.owner_id)
     async def updateManualy(self, ctx: Context):
-        if not self.bot.update_date < getmtime(BOTPATH + "/lib/bot/update.txt"):
+        if not self.bot._update_date < getmtime(BOTPATH + "/lib/bot/update.txt"):
             with open(BOTPATH + "/lib/bot/update.txt", "r", encoding="utf-8") as updatefile:
                 updateTxt = updatefile.read()
             self.bot.emitter.emit("bot_update", updateTxt)
-            self.bot.update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
+            self.bot._update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
         self.bot.update_bot()
 
     @Cog.listener()

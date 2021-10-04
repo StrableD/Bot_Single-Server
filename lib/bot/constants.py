@@ -158,7 +158,6 @@ class MyGuild:
 
     @guild.setter
     def guild(self, guild):
-        print(guild)
         self._guild = guild
 
 myGuild = MyGuild()
@@ -172,10 +171,10 @@ def member_to_json(json_dict):
                 jsonDict[key] = lookForMember(value)
             if type(key) == Member:
                 res = jsonDict.pop(key)
-                key = f"<MemberID={key.id}"
+                key = f"<MemberID={key.id}>"
                 jsonDict[key] = res
             elif type(value) == Member:
-                jsonDict[key] = f"<MemberID={value.id}"
+                jsonDict[key] = f"<MemberID={value.id}>"
         return jsonDict
     return lookForMember(json_dict)
 
@@ -196,20 +195,6 @@ class MemberJsonDecoder(json.JSONDecoder):
                     jsonDict[key] = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
             return jsonDict
         return lookForMember(json_dict)
-    """ def raw_decode(self, s: str):
-        decodedObject = super().decode(s)
-        def lookForMember(jsonDict):
-            for key, value in jsonDict.items():
-                if type(value) == dict:
-                    jsonDict[key] = lookForMember(value)
-                elif str(key).startswith("<MemberID="):
-                    res = jsonDict.pop(key)
-                    key = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
-                    jsonDict[key] = res
-                elif str(value).startswith("<MemberID="):
-                    jsonDict[key] = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
-            return jsonDict
-        return lookForMember(decodedObject) """
 
 def getCadre() -> dict[str, int]:
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:

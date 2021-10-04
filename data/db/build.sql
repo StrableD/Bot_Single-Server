@@ -32,3 +32,11 @@ CREATE TABLE IF NOT EXISTS leagues (
     LowestElo integer,
     HighestElo integer
 );
+--Die gespielten Spiele
+CREATE TABLE IF NOT EXISTS games (
+    GameNumber integer PRIMARY KEY,
+    GameDict json, --json-dict[discord.Member,dict[str, str|bool]]
+    EloDict json, --json-dict[discord.Member, int]
+    winner text,
+    evaluated boolean DEFAULT False
+)

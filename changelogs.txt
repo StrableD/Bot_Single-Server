@@ -1,0 +1,23 @@
+v1.1.1
+-> new aproach for the database interaction
+-> new database functions
+-> new command "calcAllElo"
+
+v1.1.0
+-> new command "reset"
+-> attributes of the bot are saved reguarly
+-> minor changes in elo cog
+
+v1.0.1
+-> problems reganrding the "chronicle" command fixed
+-> new hidden command "setGamemaster"
+
+v1.0.0
+-> new command "ghostvoices"
+-> new command "defaultCadre"
+-> new command "elo"
+-> removed command "exit"
+-> ranking system is integrated
+-> database is useable
+-> seveal commands got revised
+-> the appearance of the messages has been changed

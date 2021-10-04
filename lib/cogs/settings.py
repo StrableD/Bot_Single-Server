@@ -148,14 +148,16 @@ class Settings(Cog):
 
     @command(name="change", aliases=["ändern", "wechseln"])
     @has_role(getRoleID("gamemaster"))
-    async def changeCadre(self, ctx: Context, clear: bool = False):
+    async def changeCadre(self, ctx: Context, clear: Optional[str] = None):
         """
         Hiermit änderst du den aktuellen Spielekader.
         Er wird aus den auf dem Server angegeben Standard-Kadern ausgewählt.
         Wenn dieser nicht eingestellt ist, dann wird der Standard-Kader des Bots verwendet.
         ``clear``: Gibt an, ob der Kader zurückgesetzt wird (optional)
         """
-        if clear:
+        if bool(clear):
+            if clear.lower() not in ("y", "j", "yes", "ja", "t", "true", "1", "on"):
+                return
             setPlayingCadre({})
             await ctx.send(
                 "Der bisher ausgewählte Spielekader wurde gelöscht. Wenn gespielt wird, wird der Standardkader benutzt.",

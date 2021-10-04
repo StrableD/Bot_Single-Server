@@ -15,10 +15,10 @@ from discord.ext.commands.errors import CheckFailure, RoleNotFound
 
 BOTPATH = abspath(PurePath(__file__).parents[2])
 
-with open(BOTPATH + "/data/auth.json", "r") as jsonfile:
+with open(BOTPATH + "/data/auth.0", "r", encoding="utf-8") as jsonfile:
     DBPASSWORD = json.load(jsonfile).get("password")
 
-jsonfile = open(BOTPATH + "/data/auth.json", "r")
+jsonfile = open(BOTPATH + "/data/auth.0", "r", encoding="utf-8")
 TOKEN: str = json.load(jsonfile).get("token")
 jsonfile.close()
 del jsonfile

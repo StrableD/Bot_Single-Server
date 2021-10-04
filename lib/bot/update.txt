@@ -1,4 +1,4 @@
-__Version 1.1.0 closedAlpha__
+__Version 1.1.1 closedAlpha__
 
 <@&768494431136645127>
 *Anm: Die Befehle sollten soweit funktionieren, es kann jedoch trotzdem zu Komplikationen kommen. 
@@ -41,3 +41,4 @@ Bei jeglichen Fragen und Anregungen könnt ihr euch gerne an den Entwickler wend
 MfG,
 Der Entwickler 
 <@!312644293602836482>
+|https://github.com/StrableD/Bot_Single-Server|

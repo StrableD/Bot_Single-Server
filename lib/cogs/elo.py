@@ -223,7 +223,7 @@ class Elo(Cog):
         
         embed = Embed(title="Elo ausgewerted",
                       desciption="Die Elo der noch nicht ausgewerteten Spiele wurde berechnet",
-                      colour=Colour.form_rgb(0,0,0))
+                      colour=Colour.from_rgb(0,0,0))
         embed.add_field(name="Anzahl ausgewerteter Spiele", value=sum(gameNums))
         embed.add_field(name="Von diesen Spielern wurde die Elo geändert",
                         value="\n".join(map(lambda x: x.display_name if members.index(x) % 2 != 0 else f"\t{x.display_name}", members)),

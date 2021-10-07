@@ -36,7 +36,6 @@ Gewinner: {winner}"""
 
 DBPATH = BOTPATH + "/data/db/database.db"
 BUILDPATH = BOTPATH + "/data/db/build.sql"
-chmod(BOTPATH + "/data/db", 755)
 MYDB = connect(DBPATH, check_same_thread=False)
 
 

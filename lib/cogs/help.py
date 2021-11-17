@@ -1,11 +1,10 @@
 from datetime import date
+from lib.bot import My_Bot
 
-from lib.bot.constants import BOTPATH
-from os.path import getmtime
 from typing import Optional, get_args
 
 from discord import Colour, Embed, User
-from discord.ext.commands import Bot, Cog, Command, Context, check, command
+from discord.ext.commands import Cog, Command, Context, check, command
 from discord.ext.commands.converter import _Greedy
 from discord.ext.commands.errors import CheckFailure
 from discord.ext.menus import ListPageSource, MenuPages
@@ -75,7 +74,7 @@ class HelpMenu(ListPageSource):
 
 
 class Help(Cog):
-    def __init__(self, bot: Bot):
+    def __init__(self, bot: My_Bot):
         self.bot = bot
         self.bot.remove_command("help")
 
@@ -179,11 +178,6 @@ class Help(Cog):
     @command(name="update")
     @check(lambda ctx: ctx.author.id == ctx.bot.owner_id)
     async def updateManualy(self, ctx: Context):
-        if not self.bot._update_date < getmtime(BOTPATH + "/lib/bot/update.txt"):
-            with open(BOTPATH + "/lib/bot/update.txt", "r", encoding="utf-8") as updatefile:
-                updateTxt = updatefile.read()
-            self.bot.emitter.emit("bot_update", updateTxt)
-            self.bot._update_date = getmtime(BOTPATH + "/lib/bot/update.txt")
         self.bot.update_bot()
 
     @Cog.listener()
@@ -192,5 +186,5 @@ class Help(Cog):
             self.bot.cogs_ready.ready_up("help")
 
 
-def setup(bot):
+def setup(bot: My_Bot):
     bot.add_cog(Help(bot))

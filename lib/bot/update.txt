@@ -1,14 +1,10 @@
 __Version 1.1.1 closedAlpha__
 
 <@&768494431136645127>
-*Anm: Die Befehle sollten soweit funktionieren, es kann jedoch trotzdem zu Komplikationen kommen. 
-Sollte ein Problem auftreten, dann könnt ihr einfach <@!312644293602836482> anschreiben.*
 
-
-\> Der Bot hat nun das ELO und Rangsystem integriert. 
+\> Der Bot hat nun das ELO- und Rangsystem integriert. 
 \> Die Datenbank des Bots ist einsatzbereit und benutzbar.
 \> Mehrere Befehle wurden überarbeitet und das Aussehen der Nachrichten wurde großteils verändert.
-
 
 **Neue Befehle:**
 `geisterstimmen`: Schaltet die Geiterstimmen frei.
@@ -27,18 +23,16 @@ Sollte ein Problem auftreten, dann könnt ihr einfach <@!312644293602836482> ans
 
 `werteAlleAus`: Mit diesem Befehl können alle nicht ausgewerteten Spiele ausgewerted werden.
 
-
 **Entfernte Befehle:**
 `exit`: Der Bot wird geschlossen und kann nicht wieder gestartet werden.
-
 
 > Die Befehle des Bots könnt ihr mit dem Befehl ``>help`` angezeigen lassen. 
 > Wenn ihr den Befehl ``>help`` mit dem Namen eines der Befehle ausführen lasst, dann wird euch noch mehr Info zu dem Befehl angezeigt.
 
-
+Sollte irgendwas nicht funktionieren, einfach dem Entwickler per DM schreiben oder auf GitHub einen Issue einreichen.
 Bei jeglichen Fragen und Anregungen könnt ihr euch gerne an den Entwickler wenden.
 
 MfG,
 Der Entwickler 
 <@!312644293602836482>
-|https://github.com/StrableD/Bot_Single-Server|
+||Link zum GitHub des Bots: https://github.com/StrableD/Bot_Single-Server||

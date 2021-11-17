@@ -3,10 +3,10 @@ from discord.channel import TextChannel
 from lib.bot import My_Bot
 from pathlib import Path
 
-from discord import Colour, Embed, Guild, Emoji, Member, embeds
+from discord import Colour, Embed, Guild, Emoji, Member
 from discord.ext.commands import Cog, Context, command, has_role
 from discord.utils import get
-from lib.bot.constants import (
+from lib.helper.constants import (
     BOTPATH,
     EMOJIS,
     MyRoleConverter,

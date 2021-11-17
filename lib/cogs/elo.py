@@ -4,7 +4,7 @@ from discord.ext.commands import check
 from lib.bot import My_Bot
 from random import choice
 from numpy import average, e
-from lib.bot.constants import BONI, NoPerms
+from lib.helper.constants import BONI, NoPerms
 from lib.cogs.help import is_guild_owner
 from lib.db.db import (
     getElo,
@@ -237,5 +237,5 @@ class Elo(Cog):
             self.bot.cogs_ready.ready_up("elo")
 
 
-def setup(bot):
+def setup(bot: My_Bot):
     bot.add_cog(Elo(bot))

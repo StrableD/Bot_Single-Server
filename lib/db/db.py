@@ -1,12 +1,11 @@
 import json
-from operator import concat, lshift
 from os.path import isfile
 from sqlite3.dbapi2 import DataError, DatabaseError
 
-from discord import Member, member
+from discord import Member
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from lib.bot.constants import BUILDPATH, MYDB, MemberJsonDecoder, member_to_json
+from lib.helper.constants import BUILDPATH, MYDB, MemberJsonDecoder, member_to_json
 
 cursor = MYDB.cursor()
 
@@ -151,8 +150,8 @@ def getGameToEvaluate(gameNum: int):
     gameDict, eloDict, winner, evaluated = returnedTuple 
     if evaluated:
         raise DataError("The game was already evaluated") 
-    gameDict: dict = json.loads(gameDict)#, cls = MemberJsonDecoder)
-    eloDict: dict = json.loads(eloDict)#, cls=MemberJsonDecoder)
+    gameDict: dict = json.loads(gameDict, cls = MemberJsonDecoder)
+    eloDict: dict = json.loads(eloDict, cls=MemberJsonDecoder)
     for member, elo in eloDict.items():
         gameDict[member]["elo"] = elo
     gameDict["winner"] = winner

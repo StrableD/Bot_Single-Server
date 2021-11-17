@@ -3,9 +3,11 @@ Gibt Zugriff auf die Konstanten für den Bot.
 """
 
 import json
-from os import chmod, scandir
+import logging
+from os import scandir
 from os.path import abspath
 from pathlib import PurePath
+import re
 from sqlite3 import connect
 from typing import Union
 
@@ -36,7 +38,6 @@ Gewinner: {winner}"""
 
 DBPATH = BOTPATH + "/data/db/database.db"
 BUILDPATH = BOTPATH + "/data/db/build.sql"
-chmod(BOTPATH + "/data/db", 755)
 MYDB = connect(DBPATH, check_same_thread=False)
 
 
@@ -56,6 +57,12 @@ class MyRoleConverter(RoleConverter):
                     return await super().convert(ctx, str(roleID))
             raise RoleNotFound
 
+class Log_Filter(logging.Filter):
+    
+    def filter(self, record: logging.LogRecord):
+        if re.search(r"(^Add.* job)|(Scheduler started)|(^Running job)|(Job .* executed successfully)",record.msg):
+            return False
+        return True
 
 class InputError(Exception):
     pass

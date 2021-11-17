@@ -6,26 +6,17 @@ from os.path import getmtime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from discord import Guild, Intents
-from discord.channel import DMChannel
+from discord.channel import DMChannel, TextChannel
 from discord.errors import NotFound
 from discord.ext.commands import Bot, Context
 from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
 from discord.message import Message
-from lib.bot.constants import BOTPATH, COGS, TOKEN, MemberJsonDecoder, member_to_json, myGuild, NoPerms
+from lib.helper.constants import BOTPATH, COGS, TOKEN, MemberJsonDecoder, member_to_json, myGuild, NoPerms
 from lib.db.db import autosave, getChannelID, updateMembers
-from eventemitter import EventEmitter  # type: ignore
+from pyee import AsyncIOEventEmitter    # type: ignore
 import logging
 import logging.config
-
-class Log_Filter(logging.Filter):
-    def __init__(self, level, name = ""):
-        self.__level = level
-        super().__init__(name)
-    
-    def fiter(self, record):
-        return record.levelno == self.__level
-
 
 IGNORE_EXCEPTIONS = (CommandNotFound, NoPerms)
 
@@ -50,9 +41,7 @@ LOGGING = {
     },
     "filters": {
         "info_filter":{
-            "()": Log_Filter,
-            "name": "info_filter",
-            "level": "INFO"
+            "()": "ext://lib.helper.constants.Log_Filter",
         }
     },
     "handlers":{
@@ -69,14 +58,15 @@ LOGGING = {
             "level": "INFO",
             "encoding": "UTF-8",
             "formatter": "info",
-            #"filters": ["info_filter"],
+            "filters": ["info_filter",],
             "filename": BOTPATH+f"/logs/infos/infos_{date.today()}.log",
             "mode": "a"
         },
         'console': {
                 'class': 'logging.StreamHandler',
                 'formatter': 'default',
-                'level': 'INFO'
+                'level': 'INFO',
+                "filters": ["info_filter",]
             },
     },
     "loggers":{
@@ -113,7 +103,7 @@ class My_Bot(Bot):
 
         self.guild: Guild = None
         self.scheduler = AsyncIOScheduler()
-        self.emitter = EventEmitter()
+        self.emitter = AsyncIOEventEmitter()
         self.logger = logging.getLogger("Error_Logger")
 
         self._ghostvoices = False
@@ -138,9 +128,9 @@ class My_Bot(Bot):
         self.logger.info("setup complete", extra={"command":"setup", "author":"func"})
 
     async def printUpdateTxt(self, updateTxt: str):
-        await self.guild.get_channel(getChannelID("bot_channel")).send(
-            updateTxt, allowed_mentions=AllowedMentions.all()
-        )
+        bot_channel: TextChannel = self.guild.get_channel(getChannelID("bot_channel"))
+        async with bot_channel.typing():
+            await bot_channel.send(content=updateTxt, allowed_mentions=AllowedMentions.all())
 
     def update_bot(self):
         cogs = self.cogs.copy()

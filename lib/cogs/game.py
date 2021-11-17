@@ -7,7 +7,7 @@ from discord import Colour, Embed, Guild, Member, Role
 from discord.ext.commands import Bot, Cog, Context, command, check
 from discord.ext.commands.core import has_role
 from lib.bot import My_Bot
-from lib.bot.constants import (
+from lib.helper.constants import (
     CHRONICLE_PATTERN,
     InputError,
     getCadre,

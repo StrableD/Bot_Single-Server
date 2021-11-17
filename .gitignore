@@ -2,5 +2,4 @@
 **/__pycache__
 **/blueprints
 **/*.log
-data/auth.json
 data/auth.0

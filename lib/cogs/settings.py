@@ -1,11 +1,15 @@
-from typing import Optional
-from discord.channel import TextChannel
-from lib.bot import My_Bot
 from pathlib import Path
+from typing import Optional
 
 from discord import Colour, Embed, Guild, Emoji, Member
+from discord.channel import TextChannel
 from discord.ext.commands import Cog, Context, command, has_role
 from discord.utils import get
+from num2words import num2words  # type: ignore
+from word2number import w2n
+
+from lib.bot import My_Bot
+from lib.db.db import getChannelID, getRoleID
 from lib.helper.constants import (
     BOTPATH,
     EMOJIS,
@@ -14,9 +18,6 @@ from lib.helper.constants import (
     setDefaultCadre,
     setPlayingCadre,
 )
-from lib.db.db import getChannelID, getRoleID
-from num2words import num2words  # type: ignore
-from word2number import w2n
 
 
 async def updateEmojis(guild: Guild, emojis: list[int]):
@@ -58,12 +59,7 @@ async def takeSurvey(ctx: Context, theme: str, content: list[tuple]):
                     await msg.add_reaction(guildEmoji)
     reaction, user = await ctx.bot.wait_for(
         "reaction_add",
-        check=lambda m, u: (
-            str(m) in EMOJIS.values()
-            if type(m.emoji) == str
-            else m.emoji.name in map(lambda x: f"keycap_{num2words(x)}", emojiNums)
-        )
-        and not u.bot,
+        check=lambda m, u: (str(m) in EMOJIS.values() if type(m.emoji) == str else m.emoji.name in map(lambda x: f"keycap_{num2words(x)}", emojiNums)) and not u.bot,
     )
     await msg.delete()
     ctx.bot.emitter.emit("delEmojis", updatedEmojis)
@@ -84,19 +80,20 @@ class Settings(Cog):
     @property
     def cadreLength(self):
         game = self.bot.get_cog("Game")
-        return game.cadreLength
+        return game.cadreLength  # type:ignore
 
-    async def getNewCadre(self, ctx: Context):
+    @staticmethod
+    async def getNewCadre(ctx: Context):
         content = []
         for channel in ctx.guild.get_channel(
-            getChannelID("default_cadre")
+                getChannelID("default_cadre")
         ).text_channels:
             content.append((channel.name, channel.name[:2]))
         cadreSize = await takeSurvey(ctx, "Welche Kadergröße hättest du gerne", content)
 
         channelName = ""
         for name, number in content:
-            if cadreSize == int(number):
+            if cadreSize == int(number.strip(" -")):
                 channelName = name
                 break
         channel = get(ctx.guild.channels, name=channelName)
@@ -261,8 +258,8 @@ class Settings(Cog):
         ```channel```: Der Kanal, in dem die Nachrichten gelöscht werden sollen. (optional)
         """
         await ctx.message.delete()
-        
-        if channel == None:
+
+        if channel is None:
             channel = ctx.channel
         async for message in channel.history(limit=number, oldest_first=False):
             await message.delete()
@@ -288,40 +285,41 @@ class Settings(Cog):
             for x in ("bot_channel", "music_channel")
         )
         numMsgs = 0
-        
+
         msg = await ctx.send("Die Nachrichten werden geslöscht.\nDies kann einen Moment dauern.")
-        
+
         for category in filter(
-            lambda c: c.position >= game_category.position, ctx.guild.categories
+                lambda c: c.position >= game_category.position, ctx.guild.categories
         ):
             for channel in filter(
-                lambda c: type(c) == TextChannel and c not in bot_channels,
-                category.channels,
+                    lambda c: type(c) == TextChannel and c not in bot_channels,
+                    category.channels,
             ):
-                while (history := await channel.history(oldest_first=True, limit=50).flatten()) != []:
+                while history := await channel.history(oldest_first=True, limit=50).flatten():
                     for message in history:
                         await message.delete()
                         numMsgs += 1
         loveChannel = ctx.guild.get_channel(getChannelID("lovebirds"))
-        removed_players= []
+        removed_players = []
         for member in filter(
-            lambda memb: type(memb) == Member and memb != ctx.guild.owner,
-            loveChannel.overwrites,
+                lambda player: type(player) == Member and player != ctx.guild.owner,
+                loveChannel.overwrites,
         ):
             await loveChannel.set_permissions(member, overwrite=None)
             removed_players.append(member.display_name)
-        
-        embed=Embed(
-                title="Gelöschte Nachrichten",
-                description="Die Kanäle wurden geleert.",
-                colour=Colour.teal())
+
+        embed = Embed(
+            title="Gelöschte Nachrichten",
+            description="Die Kanäle wurden geleert.",
+            colour=Colour.teal())
         embed.add_field(name="Anzahl", value=str(numMsgs))
-        if removed_players != []:
+        if removed_players:
             embed.add_field(name="Liebespaar", value="\n".join(removed_players))
         await msg.delete()
-        await ctx.send(embed = embed,delete_after=100.0)
+        await ctx.send(embed=embed, delete_after=100.0)
 
-    async def delEmojis(self, EmojiList: list[Emoji]):
+    @staticmethod
+    async def delEmojis(EmojiList: list[Emoji]):
         for emoji in EmojiList:
             await emoji.delete()
 

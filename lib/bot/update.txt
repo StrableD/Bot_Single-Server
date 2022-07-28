@@ -1,17 +1,18 @@
-__Version 1.1.1 closedAlpha__
+__Version 1.2.0 closedAlpha__
 
 <@&768494431136645127>
 
 \> Der Bot hat nun das ELO- und Rangsystem integriert. 
 \> Die Datenbank des Bots ist einsatzbereit und benutzbar.
 \> Mehrere Befehle wurden überarbeitet und das Aussehen der Nachrichten wurde großteils verändert.
+\> Der Spielmodus der Rollenwahl wird jetzt vom Bot unterstützt.
 
 **Neue Befehle:**
-`geisterstimmen`: Schaltet die Geiterstimmen frei.
+
+__1.1.1__:
+
+`geisterstimmen`: Schaltet die Geisterstimmen frei.
     Sie werden nach 5 Minuten automatisch wieder gesperrt.
-`standardKader`: Hiermit kannst du den Standard-Kader des Bots festlegen. 
-    Er wird aus den auf dem Server angegebenen Standard-Kadern ausgewählt. 
-    Der Standard-Kader wird automatisch für das Spiel ausgewählt, wenn vorher kein anderer ausgewählt wird.
 `elo`: Gibt die Elo und den Rang des Autors oder des gegebenen Spielers zurück. 
     Nur ein Spielleiter kann die Infos für einen anderen Spieler anfordern. 
     ``players``: Eine Liste an Spielern mit Leerzeichen getrennt (optional)
@@ -21,15 +22,19 @@ __Version 1.1.1 closedAlpha__
     ``player``: Der Spieler, dessen Rolle zurückgesetzt werden soll, oder alle
     Möglichkeiten für ``player``: <ein Spieler>, 'all', 'alle', 'jeden'
 
-`werteAlleAus`: Mit diesem Befehl können alle nicht ausgewerteten Spiele ausgewerted werden.
+__1.2.0__:
 
-**Entfernte Befehle:**
-`exit`: Der Bot wird geschlossen und kann nicht wieder gestartet werden.
+`rollenwahl`: Diese Funktion startet ein Spiel mit Rollenwahl.
+    Die Spieler haben 5 Minuten Zeit sich mithilfe des Slashcommands `choose` eine Rolle oder eine Fraktion aus dem eingestellten Kader auszuwählen.
+    Gestartet wird mit dem bisher ausgewählten Kader und den Spielern, die mit dem Spielleiter (Autor) in einem Sprachkanal sind.
+    Es setzt außerdem den Kader und den Spielleiter für die Chronik.
 
-> Die Befehle des Bots könnt ihr mit dem Befehl ``>help`` angezeigen lassen. 
-> Wenn ihr den Befehl ``>help`` mit dem Namen eines der Befehle ausführen lasst, dann wird euch noch mehr Info zu dem Befehl angezeigt.
+`choose` (Slash-Befehl): Befehl, um die Rolle oder Fraktion zu wählen, die man bei dem Modus Rollenwahl bekommen will.
 
-Sollte irgendwas nicht funktionieren, einfach dem Entwickler per DM schreiben oder auf GitHub einen Issue einreichen.
+> Die Befehle des Bots könnt ihr mit dem Befehl ``>help`` anzeigen lassen.
+> Wenn ihr den Befehl ``>help`` mit dem Namen eines der Befehle ausführen lasst, dann wird euch noch mehr Informationen zu dem Befehl angezeigt.
+
+Sollte irgendwas nicht funktionieren, dann könnt ihr einfach dem Entwickler per DM schreiben oder auf GitHub ein Issue einreichen.
 Bei jeglichen Fragen und Anregungen könnt ihr euch gerne an den Entwickler wenden.
 
 MfG,

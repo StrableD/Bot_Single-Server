@@ -49,7 +49,8 @@ class MyRoleConverter(RoleConverter):
         except RoleNotFound:
             for row in MYDB.execute("SELECT name_bot, synonyms FROM roles"):
                 synonymList = [row[0]]
-                if row[1] != None: synonymList.extend(json.loads(row[1]))
+                if row[1] is not None:
+                    synonymList.extend(json.loads(row[1]))
                 if str(argument).lower() in synonymList:
                     roleID = MYDB.execute(
                         "SELECT id FROM roles WHERE name_bot = ?", (synonymList[0],)
@@ -57,20 +58,24 @@ class MyRoleConverter(RoleConverter):
                     return await super().convert(ctx, str(roleID))
             raise RoleNotFound
 
-class Log_Filter(logging.Filter):
-    
+
+class LogFilter(logging.Filter):
+
     def filter(self, record: logging.LogRecord):
-        if re.search(r"(^Add.* job)|(Scheduler started)|(^Running job)|(Job .* executed successfully)",record.msg):
+        if re.search(r"(^Add.* job)|(Scheduler started)|(^Running job)|(Job .* executed successfully)", record.msg):
             return False
         return True
 
+
 class InputError(Exception):
     pass
+
 
 class NoPerms(CheckFailure):
     def __init__(self, message):
         self.message = ",".join(message) if type(message) != str else message
         super().__init__(self.message)
+
 
 ALL_ROLES = [
     "Werwolf-1",
@@ -100,7 +105,7 @@ ALL_ROLES = [
     "Spielleiter",
 ]
 
-COGS = [
+COGS: list[str] = [
     cog.name.split(".")[0] for cog in scandir(BOTPATH + "/lib/cogs/") if cog.name != "__pycache__"
 ]
 
@@ -155,10 +160,11 @@ BONI = {"weißer-werwolf": 0.5,
         "seherin": 0.05
         }
 
+
 class MyGuild:
     def __init__(self):
-        self._guild=None
-    
+        self._guild = None
+
     @property
     def guild(self):
         return self._guild
@@ -166,6 +172,7 @@ class MyGuild:
     @guild.setter
     def guild(self, guild):
         self._guild = guild
+
 
 myGuild = MyGuild()
 
@@ -183,25 +190,30 @@ def member_to_json(json_dict):
             elif type(value) == Member:
                 jsonDict[key] = f"<MemberID={value.id}>"
         return jsonDict
+
     return lookForMember(json_dict)
 
+
 class MemberJsonDecoder(json.JSONDecoder):
-    def __init__(self,*args, **kwargs):
+    def __init__(self, *args, **kwargs):
         json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    def lookForMember(self, jsonDict):
+        org_dict = jsonDict.copy()
+        for key, value in org_dict.items():
+            if type(value) == dict:
+                jsonDict[key] = self.lookForMember(value)
+            if str(key).startswith("<MemberID="):
+                res = jsonDict.pop(key)
+                key = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
+                jsonDict[key] = res
+            elif str(value).startswith("<MemberID="):
+                jsonDict[key] = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
+        return jsonDict
+
     def object_hook(self, json_dict):
-        def lookForMember(jsonDict):
-            org_dict = jsonDict.copy()
-            for key, value in org_dict.items():
-                if type(value) == dict:
-                    jsonDict[key] = lookForMember(value)
-                if str(key).startswith("<MemberID="):
-                    res = jsonDict.pop(key)
-                    key = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
-                    jsonDict[key] = res
-                elif str(value).startswith("<MemberID="):
-                    jsonDict[key] = myGuild.guild.get_member(int(key.strip("<>").split("=")[1]))
-            return jsonDict
-        return lookForMember(json_dict)
+        return self.lookForMember(json_dict)
+
 
 def getCadre() -> dict[str, int]:
     with open(BOTPATH + "/data/cadres.json", "r") as cadreFile:

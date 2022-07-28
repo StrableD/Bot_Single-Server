@@ -1,1 +1,19 @@
-{"default": {"werwolfjunges": 1, "polarwolf": 1, "wolfseher": 1, "wei\u00dfer werwolf": 1, "werschweinchen": 1, "seherin": 1, "hexe": 1, "j\u00e4ger": 1, "dorfbewohner": 4, "dorfdepp": 1, "der rabe": 1}, "playing": {"werwolf": 1, "polarwolf": 1, "wolfseher": 1, "wei\u00dfer werwolf": 1, "werschweinchen": 1, "amor": 1, "seherin": 1, "hexe": 1, "j\u00e4ger": 1, "dorfbewohner": 3, "dorfdepp": 1, "der rabe": 1}, "currentgame": {}}
+{
+  "default": {
+    "werwolfjunges": 1,
+    "polarwolf": 1,
+    "wolfseher": 1,
+    "wei\u00dfer werwolf": 1,
+    "werschweinchen": 1,
+    "seherin": 1,
+    "hexe": 1,
+    "j\u00e4ger": 1,
+    "dorfbewohner": 4,
+    "dorfdepp": 1,
+    "der rabe": 1
+  },
+  "playing": {
+    "dorfbewohner": 1
+  },
+  "currentgame": {}
+}

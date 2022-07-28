@@ -3,3 +3,4 @@
 **/blueprints
 **/*.log
 data/auth.0
+data/db/database.db

@@ -1,36 +1,35 @@
 from datetime import date
-from lib.bot import My_Bot
-
 from typing import Optional, get_args
 
 from discord import Colour, Embed, User
 from discord.ext.commands import Cog, Command, Context, check, command
-from discord.ext.commands.converter import _Greedy
+from discord.ext.commands.converter import Greedy
 from discord.ext.commands.errors import CheckFailure
 from discord.ext.menus import ListPageSource, MenuPages
 from discord.utils import find
+
+from lib.bot import My_Bot
 from lib.db.db import getChannelID, resetSeason
 
 
 def is_guild_owner(ctx):
-    if ctx.guild != None:
-        return ctx.author.id in (273490147645849610,312644293602836482)
+    if ctx.guild is not None:
+        return ctx.author.id in (312644293602836482, 273490147645849610)
     else:
         return False
 
 
-def syntax(command: Command):
-    cmd_and_aliases = "|".join([str(command), *command.aliases])
+def syntax(cmd: Command):
+    cmd_and_aliases = "|".join([str(cmd), *cmd.aliases])
     prefix = ">"
 
     params = []
 
-    for key, value in command.clean_params.items():
-        if key not in ("args"):
+    for key, value in cmd.clean_params.items():
+        if key not in "args":
             params.append(
                 f"[{key}]"
-                if None in get_args(value.annotation)
-                or isinstance(value.annotation, _Greedy)
+                if None in get_args(value.annotation) or isinstance(value.annotation, Greedy)
                 else f"<{key}>"
             )
 
@@ -45,18 +44,20 @@ class HelpMenu(ListPageSource):
 
         super().__init__(data, per_page=5)
 
-    async def write_page(self, menu, fields=[]):
+    async def write_page(self, menu: MenuPages, fields=None):
+        if fields is None:
+            fields = []
         offset = (menu.current_page * self.per_page) + 1
         len_data = len(self.entries)
 
         embed = Embed(
             title="Hilfe",
-            description="Wilkommen bei der Hilfeseite vom Erzähler-Bot!",
+            description="Willkommen bei der Hilfeseite vom Erzähler-Bot!",
             colour=Colour.from_rgb(87, 204, 47),
         )
-        embed.set_thumbnail(url=self.ctx.guild.me.avatar_url)
+        embed.set_thumbnail(url=self.ctx.guild.me.avatar.url)
         embed.set_footer(
-            text=f"{offset:,} - {min(len_data, offset+self.per_page-1):,} von {len_data:,} Befehlen."
+            text=f"{offset:,} - {min(len_data, offset + self.per_page - 1):,} von {len_data:,} Befehlen."
         )
 
         for value, name in fields:
@@ -64,7 +65,7 @@ class HelpMenu(ListPageSource):
 
         return embed
 
-    async def format_page(self, menu, entries):
+    async def format_page(self, menu: MenuPages, entries):
         fields = []
 
         for entry in entries:
@@ -78,19 +79,20 @@ class Help(Cog):
         self.bot = bot
         self.bot.remove_command("help")
 
-    async def cmdHelp(self, ctx: Context, command: Command):
+    @staticmethod
+    async def cmdHelp(ctx: Context, cmd: Command):
         embed = Embed(
-            title=f"Hilfe mit `{command}`",
-            description=syntax(command),
+            title=f"Hilfe mit `{cmd}`",
+            description=syntax(cmd),
             colour=Colour.from_rgb(87, 204, 47),
         )
-        embed.add_field(name="Bescheibung des Befehls", value=command.help)
+        embed.add_field(name="Beschreibung des Befehls", value=cmd.help)
         await ctx.send(embed=embed, delete_after=20.0)
 
     @command(name="help", aliases=["hilfe"])
     async def showHelp(self, ctx: Context, cmd: Optional[str]):
         """
-        Zeigt diese Antowort.
+        Zeigt diese Antwort.
         Wenn es mit einem Befehl zusammen aufgerufen wird, dann gibt es genauere Angaben zurück.
         ``cmd``: Ein spezifischer Befehl (optional)
         """
@@ -102,8 +104,9 @@ class Help(Cog):
                         commands.append(cmd)
                 else:
                     if (not any(map(lambda f: f == is_guild_owner, cmd.checks))
-                        and not cmd.hidden and cmd.enabled):
+                            and not cmd.hidden and cmd.enabled):
                         commands.append(cmd)
+
             def filter(arg):
                 if arg.cog_name == "Game":
                     return 1
@@ -113,6 +116,7 @@ class Help(Cog):
                     return 3
                 else:
                     return 4
+
             commands.sort(key=filter)
             menu = MenuPages(
                 source=HelpMenu(ctx, commands),
@@ -121,13 +125,13 @@ class Help(Cog):
                 timeout=60.0,
             )
             await menu.start(ctx)
-            res = await self.bot.wait_for(
+            await self.bot.wait_for(
                 "message_delete", check=lambda m: m.author.id == self.bot.user.id
             )
         else:
-            if command := find(lambda m: m.name == cmd or cmd in m.aliases, self.bot.commands):
-                if any(check(ctx) for check in command.checks) or command.checks == []:
-                    await self.cmdHelp(ctx, command)
+            if cmd := find(lambda m: m.name == cmd or cmd in m.aliases, self.bot.commands):
+                if any(cmd_check(ctx) for cmd_check in cmd.checks) or cmd.checks == []:
+                    await self.cmdHelp(ctx, cmd)
                 else:
                     await ctx.send(
                         "Du hast keine Berechtigung diesen Befehl auszuführen.",
@@ -135,7 +139,8 @@ class Help(Cog):
                     )
             else:
                 await ctx.send(
-                    f"Den Befehl `{cmd}` gibt es nicht. \nBitte gib den richtigen Befehlsnamen ein, um nähere Infos zu derm Befehl zu bekommen.",
+                    f"Den Befehl `{cmd}` gibt es nicht."
+                    f"\nBitte gib den richtigen Befehlsnamen ein, um nähere Infos zu term Befehl zu bekommen.",
                     delete_after=10.0,
                 )
 
@@ -154,7 +159,7 @@ class Help(Cog):
             reason=f"{ctx.author.display_name} wollte {player.display_name} einladen.",
         )
         await player.send(
-            f'{ctx.author.display_name} will dich in die Guilde "{ctx.guild.name}" einladen: \n{invite.url}',
+            f'{ctx.author.display_name} will dich auf den Server "{ctx.guild.name}" einladen: \n{invite.url}',
             delete_after=10800.0,
         )
 
@@ -173,12 +178,15 @@ class Help(Cog):
     async def invitePlayer(self, ctx: Context):
         self.bot._season_date = date.today()
         resetSeason()
-        await ctx.send("""__Die Saison wurde beendet und eine neue angefangen.__\n\nDie gespielten Spiele und die Elo wurden zurückgesetzt""")
-    
+        await ctx.send(
+            """__Die Saison wurde beendet und eine neue angefangen.__\n
+            \nDie gespielten Spiele und die Elo wurden zurückgesetzt""")
+
     @command(name="update")
     @check(lambda ctx: ctx.author.id == ctx.bot.owner_id)
-    async def updateManualy(self, ctx: Context):
+    async def updateManually(self, ctx: Context):
         self.bot.update_bot()
+        await ctx.send("Updated bot successfully", delete_after=10.0)
 
     @Cog.listener()
     async def on_ready(self):

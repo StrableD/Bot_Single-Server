@@ -154,6 +154,16 @@ class Game(Cog):
                               if x.strip(" -1234567890") in getCadre().keys() and x not in res_dict.values()]
             res_dict[m] = random.choice(remainingCadre)
 
+        currentCadre: [Member, dict[str, str | bool]] = {}
+        for player, role in res_dict.items():
+            currentCadre[player] = {
+                "role": role,
+                "dead": False,
+                "captain": False,
+                "lovebirds": False,
+            }
+        setCurrentGameCadre(currentCadre)
+
         return res_dict
 
     @staticmethod

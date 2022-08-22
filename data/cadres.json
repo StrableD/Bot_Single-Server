@@ -13,7 +13,11 @@
     "der rabe": 1
   },
   "playing": {
-    "dorfbewohner": 1
+    "werwolf": 1,
+    "polarwolf": 1,
+    "seherin": 1,
+    "dorfbewohner": 5,
+    "der rabe": 1
   },
   "currentgame": {}
 }

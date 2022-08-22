@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from discord import Guild, Intents
 from discord.channel import DMChannel, TextChannel
 from discord.errors import NotFound
-from discord.ext.commands import Bot, Context, when_mentioned_or
+from discord.ext.commands import Bot, Context
 from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
 from discord.message import Message
@@ -99,7 +99,7 @@ class Ready(object):
 class My_Bot(Bot):
     def __init__(self):
         super().__init__(
-            command_prefix=when_mentioned_or(">"),
+            command_prefix=">",
             owner_id=312644293602836482,
             intents=Intents.all(),
             debug_guilds=[768494431124586546, 922606655085105163],
@@ -120,6 +120,8 @@ class My_Bot(Bot):
         self._current_gamemaster = None
         self._lastRound = date(1999, 1, 1)
         self._roundNum = 1
+
+        self.bot_attr = {"_update_date", "_ghostvoices", "_season_date", "_current_gamemaster", "_lastRound", "_roundNum"}
 
         autosave(self.scheduler)
 
@@ -187,7 +189,11 @@ class My_Bot(Bot):
     async def on_connect(self):
         await super().on_connect()
         self.logger.info("bot connected", extra={"command": "on_connect", "author": "func"})
+        self.logger.info("loading old bot data...", extra={"command": "update_bot_attr", "author": "func"})
         self.update_bot_attr()
+        self.logger.info("old bot data loaded", extra={"command": "update_bot_attr", "author": "func"})
+        self.guild = self.get_guild(768494431124586546)
+        myGuild.guild = self.guild
 
     async def on_disconnect(self):
         self.logger.info("bot disconnected", extra={"command": "on_disconnect", "author": "func"})
@@ -215,8 +221,7 @@ class My_Bot(Bot):
 
     async def on_ready(self):
         if not self.ready:
-            self.guild = self.get_guild(768494431124586546)
-            myGuild.guild = self.guild
+            self.logger.info("bot reading up...", extra={"command": "on_ready", "author": "func"})
             self.scheduler.start()
             self.scheduler.add_job(
                 self.update_bot, CronTrigger(day_of_week=3, hour=5, minute=0, second=0)
@@ -243,20 +248,20 @@ class My_Bot(Bot):
 
     def update_json_attr(self):
         attr_dir = list(self.__dir__())
-        attr_dir = attr_dir[:attr_dir.index("all_commands")]
-        attr_dir = list(filter(lambda x: x.startswith("_"), attr_dir))
+        cmd_attr_dir = attr_dir[:attr_dir.index("all_commands")]
+        bot_attr_dir = list(filter(lambda x: x in self.bot_attr, cmd_attr_dir))
         with open(BOTPATH + "/data/bot_attributes.toml", "r") as attr_file:
             attr_dict = toml.load(attr_file)
-        for attr in attr_dir:
+        for attr in bot_attr_dir:
             attr_dict["attributes"][attr] = self.__getattribute__(attr)
-        attr_dict = member_to_json(attr_dict)
+        member_attr_dict = member_to_json(attr_dict)
         with open(BOTPATH + "/data/bot_attributes.toml", "w") as attr_file:
-            toml.dump(attr_dict, attr_file)
+            toml.dump(member_attr_dict, attr_file)
 
     def update_bot_attr(self):
         with open(BOTPATH + "/data/bot_attributes.toml", "r") as attr_file:
-            attr_dict = toml.load(attr_file)
-        attr_dict = MemberJsonDecoder().object_hook(attr_dict["attributes"])
+            bot_attr_dict = toml.load(attr_file)
+        attr_dict = MemberJsonDecoder().object_hook(bot_attr_dict["attributes"])
         for attr, value in attr_dict.items():
             self.__setattr__(attr, value)
 

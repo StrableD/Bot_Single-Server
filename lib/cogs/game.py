@@ -6,7 +6,7 @@ from typing import Optional, Union, cast
 import discord
 from apscheduler.triggers.date import DateTrigger
 from babel.dates import format_date
-from discord import Colour, Embed, Guild, Member, Role, VoiceChannel, ApplicationContext, Interaction, SelectOption, CheckFailure
+from discord import Colour, Embed, Guild, Member, Role, VoiceChannel, Context, Interaction, SelectOption, CheckFailure
 from discord.abc import Snowflake
 from discord.ext import commands
 from discord.ext.commands import Cog, Context, check
@@ -172,7 +172,7 @@ class Game(Cog):
             return True
         return False
 
-    @commands.command(name="start", aliases=["go", "starten"])
+    @commands.hybrid_command(name="start", aliases=["go", "starten"])
     @has_role(getRoleID("gamemaster"))
     async def startGame(self, ctx: Context):
         """
@@ -272,7 +272,7 @@ class Game(Cog):
             self.bot.emitter.emit("newGame")
             self.bot._current_gamemaster = ctx.author
 
-    @commands.command(name="startWithChoice", aliases=["rollenwahl", "rolechoice"])
+    @commands.hybrid_command(name="start_with_choice", aliases=["rollenwahl", "rolechoice"])
     @has_role(getRoleID("gamemaster"))
     async def startGameWithChoice(self, ctx: Context):
         """
@@ -377,11 +377,11 @@ class Game(Cog):
             self.bot._current_gamemaster = ctx.author
             self._choices = {}
 
-    @discord.slash_command(name="choose", description="Befehl, um die Rolle oder Fraktion zu wählen, die man bei dem Modus Rollenwahl bekommen will.")
+    @commands.hybrid_command(name="choose", description="Befehl, um die Rolle oder Fraktion zu wählen, die man bei dem Modus Rollenwahl bekommen will.")
     @check(lambda x: Game._choices_active)
-    async def setChoices(self, ctx: ApplicationContext):
+    async def setChoices(self, ctx: Context):
         selection = RoleSelection()
-        await ctx.respond("Wähle eine Rolle aus", view=selection, delete_after=60.0, ephemeral=True)
+        await ctx.send("Wähle eine Rolle aus", view=selection, delete_after=60.0, ephemeral=True)
         try:
             await self.bot.wait_for("interaction", timeout=60.0)
             if selection.selected is None:
@@ -398,13 +398,13 @@ class Game(Cog):
             pass
 
     @setChoices.error
-    async def setChoiceError(self, ctx: ApplicationContext, exc: Exception):
+    async def setChoiceError(self, ctx: Context, exc: Exception):
         if isinstance(exc, CheckFailure):
-            await ctx.respond("Du kannst keine Rolle auswählen. Entweder sind die 5 Minuten schon vorbei oder es wurde noch kein Spiel mit Rollenwahl gestartet.", delete_after=30, ephemeral=True)
+            await ctx.send("Du kannst keine Rolle auswählen. Entweder sind die 5 Minuten schon vorbei oder es wurde noch kein Spiel mit Rollenwahl gestartet.", delete_after=30, ephemeral=True)
         else:
             raise exc
 
-    @commands.command(name="dead", aliases=["tot"])
+    @commands.hybrid_command(name="dead", aliases=["tot"])
     @has_role(getRoleID("gamemaster"))
     async def setDead(self, ctx: Context, player: Optional[Member]):
         """
@@ -438,11 +438,11 @@ class Game(Cog):
             colour=Colour.from_rgb(0, 0, 0),
         )
         embed.add_field(
-            name="Rollen", value="\n".join(role.name for role in player.roles)
+            name="rollen", value="\n".join(role.name for role in player.roles)
         )
         await ctx.send(embed=embed, delete_after=60.0)
 
-    @commands.command(name="captain", aliases=["hauptmann", "cp"])
+    @commands.hybrid_command(name="captain", aliases=["hauptmann", "cp"])
     @has_role(getRoleID("gamemaster"))
     async def setCaptain(self, ctx: Context, player: Optional[Member]):
         """
@@ -466,11 +466,11 @@ class Game(Cog):
             colour=Colour.orange(),
         )
         embed.add_field(
-            name="Rollen", value="\n".join(role.name for role in player.roles)
+            name="rollen", value="\n".join(role.name for role in player.roles)
         )
         await ctx.send(embed=embed, delete_after=60.0)
 
-    @commands.command(name="chronicle", aliases=["chronik", "writeChronicle", "wrCr"])
+    @commands.hybrid_command(name="chronicle", aliases=["chronik", "writeChronicle", "wrCr"])
     @has_role(getRoleID("gamemaster"))
     async def writeChronicle(self, ctx: Context, maxPlayers: Optional[int] = 20):
         """
@@ -575,7 +575,7 @@ class Game(Cog):
                 await player.edit(mute=False)
         setCurrentGameCadre({})
 
-    @commands.command(name="love", aliases=["liebe", "liebende"])
+    @commands.hybrid_command(name="love", aliases=["liebe", "liebende"])
     @has_role(getRoleID("gamemaster"))
     async def setLovebirds(self, ctx: Context, player1: Member, player2: Member):
         """
@@ -606,7 +606,7 @@ class Game(Cog):
             delete_after=60.0,
         )
 
-    @commands.command(name="removeLove", aliases=["minusLove", "entferneLiebe", "rmLv"])
+    @commands.hybrid_command(name="remove_love", aliases=["minusLove", "entferneLiebe", "rmLv"])
     @has_role(getRoleID("gamemaster"))
     async def removeLovebirds(self, ctx: Context):
         """
@@ -632,7 +632,7 @@ class Game(Cog):
             delete_after=60.0,
         )
 
-    @commands.command(name="ghostvoices", aliases=["geisterstimmen", "gv", "gs"])
+    @commands.hybrid_command(name="ghostvoices", aliases=["geisterstimmen", "gv", "gs"])
     @has_role(getRoleID("gamemaster"))
     async def setGhostvoices(self, ctx: Context):
         """
@@ -645,7 +645,7 @@ class Game(Cog):
             self.resetGhostvoices(), DateTrigger(del_time, del_time.tzinfo)
         )
 
-    @commands.command(name="reset", aliases=["resette", "restart"])
+    @commands.hybrid_command(name="reset", aliases=["resette", "restart"])
     @has_role(getRoleID("gamemaster"))
     async def resetRole(self, ctx: Context, player: Union[Member, str]):
         """
@@ -685,10 +685,10 @@ class Game(Cog):
                       description="Das Spiel sieht jetzt wie folgt aus:",
                       color=Colour.from_rgb(255, 0, 120))
         value = "\n".join(map(lambda m: f"{m[0].display_name}: {m[1]['role'].upper()}", res_cadre.items()))
-        embed.add_field(name="Kader", value=value)
+        embed.add_field(name="kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
 
-    @commands.command(name="setGamemaster", aliases=["sG"], hidden=True)
+    @commands.hybrid_command(name="set_gamemaster", aliases=["sG"], hidden=True)
     @check(is_guild_owner)
     async def setGamemaster(self, ctx: Context, player: Member):
         self.bot._current_gamemaster = player
@@ -703,8 +703,8 @@ class Game(Cog):
             self.bot.cogs_ready.ready_up("game")
 
 
-def setup(bot: My_Bot):
-    bot.add_cog(Game(bot))
+async def setup(bot: My_Bot):
+    await bot.add_cog(Game(bot))
 
 
 class RoleSelection(View):

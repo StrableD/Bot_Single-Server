@@ -1,0 +1,84 @@
+all_roles:
+  - "Werwolf-1"
+  - "Werwolf-2"
+  - "Polarwolf"
+  - "Wolfsseher"
+  - "Werwolfjunges"
+  - "Weißer-Werwolf"
+  - "Werschweinchen"
+  - "Jason"
+  - "Jäger"
+  - "Hexe"
+  - "Seherin"
+  - "Amor"
+  - "Dorfdepp"
+  - "Rotkäppchen"
+  - "Geschwister-1"
+  - "Geschwister-2"
+  - "Geschwister-3"
+  - "Geschwister-4"
+  - "Dorfbewohner-1"
+  - "Dorfbewohner-2"
+  - "Dorfbewohner-3"
+  - "Der-Rabe"
+  - "tot"
+  - "Hauptmann"
+  - "Spielleiter"
+
+emojis:
+  0: "0️⃣"
+  1: "1️⃣"
+  2: "2️⃣"
+  3: "3️⃣"
+  4: "4️⃣"
+  5: "5️⃣"
+  6: "6️⃣"
+  7: "7️⃣"
+  8: "8️⃣"
+  9: "9️⃣"
+  10: "🔟"
+
+timings:
+  # "role": [nacht, durchgehend, abhängig vom einsetzen der fähigkeit]
+  amor: [1, false, false]
+  polarwolf: [1, true, false]
+  seherin: [1, true, false]
+  werwolf: [1, true, false]
+  wolfseher: [1, true, false]
+  weiser-werwolf: [2, true, true]
+  hexe: [1, true, false]
+  geschwister: [2, true, false]
+  der-rabe: [1, true, false]
+
+roleaura:
+  normal:
+    - "dorfbewohner"
+    - "amor"
+    - "rotkäppchen"
+    - "geschwister"
+    - "dorfdepp"
+  special:
+    - "hexe"
+    - "jäger"
+    - "seherin"
+    - "werschweinchen"
+    - "der-rabe"
+
+boni:
+  weißer-werwolf: 0.5
+  lovebirds: 0.4
+  dorfbewohner: 0.35
+  amor: 0.35
+  jäger: 0.3
+  werschweinchen: 0.25
+  der-rabe: 0.25
+  jason: 0.25
+  dorfdepp: 0.25
+  werwolf: 0.2
+  geschwister: 0.15
+  werwolfjunges: 0.15
+  rotkäppchen: 0.1
+  polarwolf: 0.1
+  hexe: 0.1
+  wolfseher: 0.1
+  seherin: 0.05

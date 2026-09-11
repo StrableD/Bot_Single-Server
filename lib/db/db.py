@@ -1,12 +1,19 @@
 import json
-from os.path import isfile
+from os.path import isfile, abspath
+from pathlib import PurePath
+import sqlite3
 from sqlite3.dbapi2 import DataError, DatabaseError
 from typing import Any
 
 from discord import Member
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from lib.helper.constants import BUILDPATH, MYDB, MemberJsonDecoder, member_to_json
+from lib.helper.utils import member_to_json, MemberJsonDecoder
+
+BOTPATH = abspath(PurePath(__file__).parents[2])
+DBPATH = BOTPATH + "/data/db/database.db"
+BUILDPATH = BOTPATH + "/data/db/build.sql"
+MYDB = sqlite3.connect(DBPATH, check_same_thread=False)
 
 cursor = MYDB.cursor()
 
@@ -157,17 +164,21 @@ def getUnevaluatedGames():
     return sortedgameNums
 
 
-def getGameToEvaluate(gameNum: int):
+def getGameToEvaluate(gameNum: int, guild=None):
     returnedTuple = getData("games", ("GameDict", "EloDict", "winner", "evaluated"), ("GameNumber", gameNum))
     if not bool(returnedTuple):
         raise DataError("No such data in the database")
     gameDictStr, eloDictStr, winner, evaluated = returnedTuple
     if evaluated:
         raise DataError("The game was already evaluated")
-    gameDict: dict = json.loads(gameDictStr, cls=MemberJsonDecoder)
-    eloDict: dict = json.loads(eloDictStr, cls=MemberJsonDecoder)
+    
+    decoder = MemberJsonDecoder(guild=guild)
+    gameDict: dict = decoder.decode(gameDictStr)
+    eloDict: dict = decoder.decode(eloDictStr)
+    
     for member, elo in eloDict.items():
-        gameDict[member]["elo"] = elo
+        if member in gameDict:
+            gameDict[member]["elo"] = elo
     gameDict["winner"] = winner
     return gameDict
 

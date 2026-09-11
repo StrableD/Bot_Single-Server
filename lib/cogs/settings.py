@@ -3,7 +3,7 @@ from typing import Optional
 
 from discord import Colour, Embed, Guild, Emoji, Member
 from discord.channel import TextChannel
-from discord.ext.commands import Cog, Context, command, has_role
+from discord.ext.commands import Cog, Context, hybrid_command, has_role
 from discord.utils import get
 from num2words import num2words  # type: ignore
 from word2number import w2n
@@ -121,7 +121,7 @@ class Settings(Cog):
                 squadDict[role] += 1
         return squadDict
 
-    @command(name="standardkader", aliases=["dafaultcadre", "defcadre"])
+    @commands.hybrid_command(name="standardkader", aliases=["dafaultcadre", "defcadre"])
     @has_role(getRoleID("gamemaster"))
     async def setDefaultCadre(self, ctx: Context):
         """
@@ -143,7 +143,7 @@ class Settings(Cog):
         embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
 
-    @command(name="change", aliases=["ändern", "wechseln"])
+    @commands.hybrid_command(name="change", aliases=["ändern", "wechseln"])
     @has_role(getRoleID("gamemaster"))
     async def changeCadre(self, ctx: Context, clear: Optional[str] = None):
         """
@@ -177,7 +177,7 @@ class Settings(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     # last stand with lukas
-    @command(name="fill", aliases=["hinzufügen", "add"])
+    @commands.hybrid_command(name="fill", aliases=["hinzufügen", "add"])
     @has_role(getRoleID("gamemaster"))
     async def addCitizen(self, ctx: Context):
         """
@@ -193,7 +193,7 @@ class Settings(Cog):
         setPlayingCadre(cadre)
         await self.returnCadre(ctx)
 
-    @command(name="minus", aliases=["entfernen", "sub"])
+    @commands.hybrid_command(name="minus", aliases=["entfernen", "sub"])
     @has_role(getRoleID("gamemaster"))
     async def removeCitizen(self, ctx: Context):
         """
@@ -218,7 +218,7 @@ class Settings(Cog):
         setPlayingCadre(cadre)
         await self.returnCadre(ctx)
 
-    @command(name="cadre", aliases=["kader"])
+    @commands.hybrid_command(name="cadre", aliases=["kader"])
     async def returnCadre(self, ctx: Context):
         """
         Gibt den aktuellen Kader zurück.
@@ -234,7 +234,7 @@ class Settings(Cog):
         embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
 
-    @command(name="setRole", aliases=["gibRolle", "role"])
+    @commands.hybrid_command(name="set_role", aliases=["gibRolle", "role"])
     @has_role(getRoleID("gamemaster"))
     async def setPlayerRole(self, ctx: Context, player: Member, role: MyRoleConverter):
         await player.add_roles(role)
@@ -244,12 +244,12 @@ class Settings(Cog):
                 description=f"Der Spieler {player.display_name} hat folgende Rollen:",
                 color=Colour.random(),
             ).add_field(
-                name="Rollen", value="\n".join(map(lambda x: x.name, player.roles))
+                name="rollen", value="\n".join(map(lambda x: x.name, player.roles))
             ),
             delete_after=100.0,
         )
 
-    @command(name="delete", aliases=["lösche", "del"])
+    @commands.hybrid_command(name="delete", aliases=["lösche", "del"])
     @has_role(getRoleID("gamemaster"))
     async def deleteMessages(self, ctx: Context, number: Optional[int] = 1, channel: Optional[TextChannel] = None):
         """
@@ -267,11 +267,11 @@ class Settings(Cog):
         await ctx.send(
             embed=Embed(
                 title="Gelöschte Nachrichten", colour=Colour.teal()
-            ).add_field(name="Anzahl", value=str(number)),
+            ).add_field(name="anzahl", value=str(number)),
             delete_after=60.0,
         )
 
-    @command(name="clear", aliases=["aufräumen", "leeren"])
+    @commands.hybrid_command(name="clear", aliases=["aufräumen", "leeren"])
     @has_role(getRoleID("gamemaster"))
     async def clearGameChannels(self, ctx: Context):
         """
@@ -312,9 +312,9 @@ class Settings(Cog):
             title="Gelöschte Nachrichten",
             description="Die Kanäle wurden geleert.",
             colour=Colour.teal())
-        embed.add_field(name="Anzahl", value=str(numMsgs))
+        embed.add_field(name="anzahl", value=str(numMsgs))
         if removed_players:
-            embed.add_field(name="Liebespaar", value="\n".join(removed_players))
+            embed.add_field(name="liebespaar", value="\n".join(removed_players))
         await msg.delete()
         await ctx.send(embed=embed, delete_after=100.0)
 
@@ -329,5 +329,5 @@ class Settings(Cog):
             self.bot.cogs_ready.ready_up("settings")
 
 
-def setup(bot):
-    bot.add_cog(Settings(bot))
+async def setup(bot):
+    await bot.add_cog(Settings(bot))

@@ -3,4 +3,6 @@
 **/blueprints
 **/*.log
 data/auth.0
-data/db/database.db
+data/db/*.db
+.env
+data/music_cache/

@@ -19,7 +19,7 @@ from lib.db.db import (
     setPlayerElo
 )
 from discord import Embed, Member, Colour
-from discord.ext.commands import Cog, command, Greedy, Context
+from discord.ext.commands import Cog, hybrid_command, Greedy, Context
 
 
 class Elo(Cog):
@@ -43,7 +43,7 @@ class Elo(Cog):
     def set_calculated_to_false(self):
         self.elo_calculated = False
 
-    @command(name="elo")
+    @commands.hybrid_command(name="elo")
     async def getPlayerElo(self, ctx: Context, players: Greedy[Member]):
         """
         Gibt die Elo und den Rang des Autors oder des gegebenen Spielers zurück.
@@ -212,7 +212,7 @@ class Elo(Cog):
         setGameToIsEvaluate(gameNumber)
         self.elo_calculated = True
 
-    @command(name="calcAllElo", aliases=["werteAlleAus", "waa", "cae"])
+    @commands.hybrid_command(name="calc_all_elo", aliases=["werteAlleAus", "waa", "cae"])
     @check(is_guild_owner)
     async def calculateAllElo(self, ctx: Context):
         """
@@ -242,5 +242,5 @@ class Elo(Cog):
             self.bot.cogs_ready.ready_up("elo")
 
 
-def setup(bot: My_Bot):
-    bot.add_cog(Elo(bot))
+async def setup(bot: My_Bot):
+    await bot.add_cog(Elo(bot))

@@ -1,187 +1,128 @@
+import asyncio
 import json
 from os.path import isfile, abspath
 from pathlib import PurePath
-import sqlite3
-from sqlite3.dbapi2 import DataError, DatabaseError
-from typing import Any
-
-from discord import Member
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import select, update, delete
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from lib.helper.utils import member_to_json, MemberJsonDecoder
+from lib.db.models import Base, Channel, Role, Player, League, Game, BotState, GameCadre
+from discord import Member
 
 BOTPATH = abspath(PurePath(__file__).parents[2])
 DBPATH = BOTPATH + "/data/db/database.db"
-BUILDPATH = BOTPATH + "/data/db/build.sql"
-MYDB = sqlite3.connect(DBPATH, check_same_thread=False)
 
-cursor = MYDB.cursor()
+# Create async engine and sessionmaker
+engine = create_async_engine(f"sqlite+aiosqlite:///{DBPATH}", echo=False)
+AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-
-def commit():
-    MYDB.commit()
-
-
-def with_commit(func):
-    def inner(*args, **kwargs):
-        res = func(*args, **kwargs)
-        commit()
-        return res
-
-    return inner
-
-
-# erstellt die db
-@with_commit
-def build():
-    if isfile(BUILDPATH):
-        with open(BUILDPATH, "r", encoding="utf-8") as script:
-            cursor.executescript(script.read())
-
+async def build():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 def autosave(sched: AsyncIOScheduler):
-    sched.add_job(commit, CronTrigger(second="*/20"))
+    pass # Managed by session commits natively now, but we can leave this for backwards compat if needed
 
+async def getChannelID(bot_name: str) -> int:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Channel).where(Channel.name_bot == bot_name))
+        channel = result.scalar_one_or_none()
+        if channel:
+            return channel.id
+        raise ValueError(f"Channel {bot_name} not found")
 
-# holt sich die angeforderte infos
-def getData(table: str, columns: tuple, key: tuple[str, Any]) -> list:
-    if type(key[1]) == str:
-        cmd = f"SELECT {','.join(columns)} FROM {table} WHERE {key[0]} = '{key[1]}';"
-    else:
-        cmd = f"SELECT {','.join(columns)} FROM {table} WHERE {key[0]} = {key[1]};"
-    cursor.execute(cmd)
-    return cursor.fetchone()
+async def getRoleID(bot_name: str) -> int:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Role).where(Role.name_bot == bot_name))
+        role = result.scalar_one_or_none()
+        if role:
+            return role.id
+        raise ValueError(f"Role {bot_name} not found")
 
+async def getRoleTeam(bot_name: str) -> str:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Role).where(Role.name_bot == bot_name))
+        role = result.scalar_one_or_none()
+        if role:
+            return role.team
+        raise ValueError(f"Role {bot_name} not found")
 
-# setzt die gegebenen infos in der tabelle
-@with_commit
-def setData(table: str, columns: tuple, values: tuple, condition: str = None):
-    try:
-        if condition is None:
-            cmd = f"INSERT INTO {table} {','.join(columns)} VALUES {values};"
-            cursor.execute(cmd)
-        else:
-            zipped = tuple(zip(columns, values))
-            concat = map(lambda x: f'{x[0]} = {x[1]}', zipped)
-            cmd = f"UPDATE {table} SET {','.join(concat)} WHERE {condition};"
-            cursor.execute(cmd)
-    except:
-        return False
-    else:
-        return True
+async def getElo(player_id: int):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Player).where(Player.PlayerId == player_id))
+        player = result.scalar_one_or_none()
+        return player.Elo if player else None
 
+async def setPlayerElo(player_id: int, new_elo: int):
+    async with AsyncSessionLocal() as session:
+        await session.execute(update(Player).where(Player.PlayerId == player_id).values(Elo=new_elo))
+        await session.commit()
 
-def getChannelID(bot_name: str) -> int:
-    data = getData("channels", ("id",), ("name_bot", bot_name))
-    if data is None or type(data[0]) != int:
-        raise DataError
-    elif len(data) != 1:
-        raise DatabaseError
-    else:
-        return data[0]
+async def getLeagues():
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(League))
+        leagues = result.scalars().all()
+        return {l.LeagueName: (l.LowestElo or 0, l.HighestElo or 10000) for l in leagues}
 
+async def resetSeason():
+    async with AsyncSessionLocal() as session:
+        await session.execute(update(Player).values(PlayedGamesSeason=0, WonGamesSeason=0, Elo=1300))
+        await session.commit()
 
-def getRoleID(bot_name: str) -> int:
-    data = getData("roles", ("id",), ("name_bot", bot_name))
-    if data is None or type(data[0]) != int:
-        raise DataError
-    elif len(data) != 1:
-        raise DatabaseError
-    else:
-        return data[0]
+async def updateMembers(members: list[Member]):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Player.PlayerId))
+        player_ids = set(result.scalars().all())
+        
+        for member in members:
+            if member.id in player_ids:
+                await session.execute(update(Player).where(Player.PlayerId == member.id).values(PlayerName=member.display_name))
+            else:
+                new_player = Player(PlayerName=member.display_name, PlayerId=member.id)
+                session.add(new_player)
+        await session.commit()
 
+async def saveCurrentGame(gameCadre: dict, winner: str):
+    async with AsyncSessionLocal() as session:
+        eloDict = {}
+        for member in gameCadre:
+            elo = await getElo(member.id)
+            eloDict[member] = elo
 
-def getRoleTeam(bot_name: str) -> str:
-    data = getData("roles", ("team",), ("name_bot", bot_name))
-    if data is None or type(data[0]) != str:
-        raise DataError
-    elif len(data) != 1:
-        raise DatabaseError
-    else:
-        return data[0]
+        jsonGameCadre = member_to_json(gameCadre)
+        jsonEloDict = member_to_json(eloDict)
 
+        game = Game(GameDict=jsonGameCadre, EloDict=jsonEloDict, winner=winner)
+        session.add(game)
+        await session.commit()
+        return game.GameNumber
 
-def getElo(player_id: int):
-    data = getData("players", ("Elo",), ("PlayerID", player_id))
-    if data is None:
-        return bool(None)
-    elif type(data[0]) != int:
-        raise DataError
-    elif len(data) != 1:
-        raise DatabaseError
-    else:
-        return int(data[0])
+async def getUnevaluatedGames():
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Game.GameNumber).where(Game.evaluated == False))
+        return sorted(result.scalars().all())
 
+async def getGameToEvaluate(gameNum: int, guild=None):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Game).where(Game.GameNumber == gameNum))
+        game = result.scalar_one_or_none()
+        if not game:
+            raise ValueError("No such data in the database")
+        if game.evaluated:
+            raise ValueError("The game was already evaluated")
+        
+        decoder = MemberJsonDecoder(guild=guild)
+        gameDict = decoder.decode(json.dumps(game.GameDict)) if isinstance(game.GameDict, dict) else decoder.decode(game.GameDict)
+        eloDict = decoder.decode(json.dumps(game.EloDict)) if isinstance(game.EloDict, dict) else decoder.decode(game.EloDict)
+        
+        for member, elo in eloDict.items():
+            if member in gameDict:
+                gameDict[member]["elo"] = elo
+        gameDict["winner"] = game.winner
+        return gameDict
 
-def setPlayerElo(player_id: int, new_elo: int):
-    dataSet = setData("players", ("Elo",), (new_elo,), f"PlayerID = {player_id}")
-    if not dataSet:
-        raise DataError("Could not set the PlayerElo")
-
-
-def getLeagues():
-    league_dict = {}
-    for row in cursor.execute("SELECT * FROM leagues;"):
-        league_dict[row[0]] = (row[1] if row[1] is not None else 0, row[2] if row[2] is not None else 10000)
-    return league_dict
-
-
-@with_commit
-def resetSeason():
-    cursor.execute("UPDATE players SET PlayedGamesSeason = 0, WonGamesSeason = 0, Elo = 1300;")
-
-
-@with_commit
-def updateMembers(members: list[Member]):
-    for member in members:
-        playerids = cursor.execute("SELECT PlayerID FROM players").fetchall()
-        playerids = tuple(map(lambda x: x[0], playerids))
-        if not bool(playerids):
-            cmd = f"INSERT INTO players(PlayerName, PlayerID) VALUES {(member.display_name, member.id)};"
-        elif member.id in playerids:
-            cmd = f"UPDATE players SET PlayerName = '{member.display_name}' WHERE PlayerID = '{member.id}';"
-        else:
-            cmd = f"INSERT INTO players(PlayerName, PlayerID) VALUES {(member.display_name, member.id)};"
-        cursor.execute(cmd)
-
-
-def saveCurrentGame(gameCadre: dict, winner: str):
-    eloDict = {}
-    for member in gameCadre:
-        eloDict[member] = getElo(member)
-
-    jsonGameCadre = json.dumps(member_to_json(gameCadre))
-    jsonEloDict = json.dumps(member_to_json(eloDict))
-
-    setData("games", ("GameDict", "EloDict", "winner"), (jsonGameCadre, jsonEloDict, winner))
-    return cursor.lastrowid
-
-
-def getUnevaluatedGames():
-    cursor.execute("SELECT GameNumber FROM games WHERE evaluated = 0")
-    gameNums = map(lambda x: x[0], cursor.fetchall())
-    sortedgameNums = sorted(gameNums)
-    return sortedgameNums
-
-
-def getGameToEvaluate(gameNum: int, guild=None):
-    returnedTuple = getData("games", ("GameDict", "EloDict", "winner", "evaluated"), ("GameNumber", gameNum))
-    if not bool(returnedTuple):
-        raise DataError("No such data in the database")
-    gameDictStr, eloDictStr, winner, evaluated = returnedTuple
-    if evaluated:
-        raise DataError("The game was already evaluated")
-    
-    decoder = MemberJsonDecoder(guild=guild)
-    gameDict: dict = decoder.decode(gameDictStr)
-    eloDict: dict = decoder.decode(eloDictStr)
-    
-    for member, elo in eloDict.items():
-        if member in gameDict:
-            gameDict[member]["elo"] = elo
-    gameDict["winner"] = winner
-    return gameDict
-
-
-def setGameToIsEvaluate(gameNum: int):
-    return setData("games", ("evaluated",), (1,), f"GameNumber = {gameNum}")
+async def setGameToIsEvaluate(gameNum: int):
+    async with AsyncSessionLocal() as session:
+        await session.execute(update(Game).where(Game.GameNumber == gameNum).values(evaluated=True))
+        await session.commit()

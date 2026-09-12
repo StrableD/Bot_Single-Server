@@ -152,7 +152,7 @@ class Help(Cog):
         Hierfür wird der Discordname und der Diskriminator eingegeben werden.
         ``player``: Der Spieler in Form von Name#Diskriminator
         """
-        inviteChannel = ctx.guild.get_channel(getChannelID("invites"))
+        inviteChannel = ctx.guild.get_channel(await getChannelID("invites"))
         invite = await inviteChannel.create_invite(
             max_age=10800,
             max_uses=1,
@@ -177,7 +177,7 @@ class Help(Cog):
     @check(is_guild_owner)
     async def invitePlayer(self, ctx: Context):
         self.bot._season_date = date.today()
-        resetSeason()
+        await resetSeason()
         await ctx.send(
             """__Die Saison wurde beendet und eine neue angefangen.__\n
             \nDie gespielten Spiele und die Elo wurden zurückgesetzt""")

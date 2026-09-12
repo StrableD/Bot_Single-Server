@@ -15,9 +15,11 @@ from discord.ext.commands import Bot, Context
 from discord.ext.commands.errors import CommandNotFound
 from discord.mentions import AllowedMentions
 from discord.message import Message
-from pyee.asyncio import AsyncIOEventEmitter  # updated to pyee.asyncio
+from pyee.asyncio import AsyncIOEventEmitter
 
-from lib.db.db import autosave, getChannelID, updateMembers, MYDB
+from lib.db.db import autosave, getChannelID, updateMembers, AsyncSessionLocal, build
+from lib.db.models import BotState
+from sqlalchemy import select, update
 from lib.helper.constants import BOTPATH, COGS, TOKEN
 from lib.helper.utils import member_to_json, MemberJsonDecoder
 from lib.helper.errors import NoPerms
@@ -90,6 +92,7 @@ class My_Bot(Bot):
         autosave(self.scheduler)
 
     async def setup_hook(self):
+        await build() # Initialize SQLAlchemy ORM schema
         for cog in COGS:
             try:
                 await self.load_extension(f"lib.cogs.{cog}")
@@ -100,13 +103,11 @@ class My_Bot(Bot):
         await self.tree.sync()
         self.logger.info("setup complete")
 
-    def update_bot(self):
-        # implementation omitted for brevity, but should reload extensions
+    async def update_bot(self):
         pass
 
     def run(self):
         super().run(TOKEN, reconnect=True)
-        self.update_json_attr()
 
     async def process_commands(self, message: Message):
         ctx = await self.get_context(message, cls=Context)
@@ -124,12 +125,12 @@ class My_Bot(Bot):
         await super().on_connect()
         self.logger.info("bot connected")
         self.guild = self.guilds[0] if self.guilds else None
-        self.update_bot_attr()
+        await self.update_bot_attr()
         self.logger.info("old bot data loaded")
 
     async def on_disconnect(self):
         self.logger.info("bot disconnected")
-        self.update_json_attr()
+        await self.update_json_attr()
 
     async def on_command_error(self, ctx, exc):
         if any([isinstance(exc, error) for error in IGNORE_EXCEPTIONS]):
@@ -147,7 +148,8 @@ class My_Bot(Bot):
                 self.update_bot, CronTrigger(day_of_week=3, hour=5, minute=0, second=0)
             )
 
-            updateMembers(list(filter(lambda x: not x.bot, self.guild.members))) if self.guild else None
+            if self.guild:
+                await updateMembers(list(filter(lambda x: not x.bot, self.guild.members)))
 
             while not self.cogs_ready.all_ready():
                 await sleep(0.5)
@@ -163,7 +165,7 @@ class My_Bot(Bot):
                 await self.process_commands(message)
         await super().on_message(message)
 
-    def update_json_attr(self):
+    async def update_json_attr(self):
         attr_dict = {}
         for attr in self.bot_attr:
             val = getattr(self, attr, None)
@@ -173,19 +175,29 @@ class My_Bot(Bot):
                 attr_dict[attr] = val
         
         member_attr_dict = member_to_json(attr_dict)
-        MYDB.execute("INSERT OR REPLACE INTO bot_state (key, value) VALUES ('bot_attributes', ?)", (json.dumps(member_attr_dict),))
-        MYDB.commit()
+        json_data = json.dumps(member_attr_dict)
+        
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(BotState).where(BotState.key == 'bot_attributes'))
+            state = result.scalar_one_or_none()
+            if state:
+                state.value = json_data
+            else:
+                session.add(BotState(key='bot_attributes', value=json_data))
+            await session.commit()
 
-    def update_bot_attr(self):
-        row = MYDB.execute("SELECT value FROM bot_state WHERE key = 'bot_attributes'").fetchone()
-        if row:
-            attr_dict = MemberJsonDecoder(guild=self.guild).decode(row[0])
-            for attr, value in attr_dict.items():
-                if attr in ("_season_date", "_lastRound") and isinstance(value, str):
-                    try:
-                        value = date.fromisoformat(value)
-                    except ValueError:
-                        pass
-                setattr(self, attr, value)
+    async def update_bot_attr(self):
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(BotState).where(BotState.key == 'bot_attributes'))
+            state = result.scalar_one_or_none()
+            if state and state.value:
+                attr_dict = MemberJsonDecoder(guild=self.guild).decode(state.value)
+                for attr, value in attr_dict.items():
+                    if attr in ("_season_date", "_lastRound") and isinstance(value, str):
+                        try:
+                            value = date.fromisoformat(value)
+                        except ValueError:
+                            pass
+                    setattr(self, attr, value)
 
 bot = My_Bot()

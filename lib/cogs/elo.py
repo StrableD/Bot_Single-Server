@@ -50,8 +50,8 @@ class Elo(Cog):
         Nur ein Spielleiter kann die Infos für einen anderen Spieler anfordern.
         ``players``: Eine Liste an Spielern mit Leerzeichen getrennt (optional)
         """
-        leagues = getLeagues()
-        if players == [] and (elo := getElo(ctx.author.id)) is not None:
+        leagues = await getLeagues()
+        if players == [] and (elo := await getElo(ctx.author.id)) is not None:
             embed = Embed(title="ELO Info", colour=Colour.from_rgb(154, 7, 125))
             embed.set_thumbnail(url=ctx.author.avatar_url)
             league = ""
@@ -65,9 +65,9 @@ class Elo(Cog):
             )
             embed.add_field(name="**Server**", value=ctx.guild.name, inline=False)
             await ctx.author.send(embed=embed, delete_after=45.0)
-        elif players != [] and not any(role.id == getRoleID("gamemaster") for role in ctx.author.roles):
+        elif players != [] and not any(role.id == await getRoleID("gamemaster") for role in ctx.author.roles):
             raise NoPerms("Adminrechte")
-        elif players != [] and all(elo := tuple(getElo(player.id) for player in players)):
+        elif players != [] and all(elo := tuple(await getElo(player.id) for player in players)):
             embed = Embed(title="ELO Info", colour=Colour.from_rgb(154, 7, 125))
             embed.set_thumbnail(url=choice(players).avatar_url)
             fields = []
@@ -99,7 +99,7 @@ class Elo(Cog):
                 player_without.append(player.display_name)
             else:
                 for p in player:
-                    if not getElo(p.id):
+                    if not await getElo(p.id):
                         player_without.append(p.display_name)
             embed.add_field(
                 name="Diese Spieler haben keine ELO"
@@ -176,7 +176,7 @@ class Elo(Cog):
         playedGames, wonGames = getData("players", ("PlayedGamesSeason", "WonGameSeason"), ("PlayerId", player.id))
         placementValue = 2 * wonGames - playedGames
         elo = 1300 + placementValue * 50
-        setPlayerElo(player.id, elo)
+        await setPlayerElo(player.id, elo)
 
     @staticmethod
     def increaseGames(player: Member, role: str, win: bool):
@@ -196,10 +196,10 @@ class Elo(Cog):
         """Die Elo der Spieler wird hier am Ende eines Spieles berechnet und gespeichert"""
         if self.elo_calculated:
             return
-        game = getGameToEvaluate(gameNumber)
+        game = await getGameToEvaluate(gameNumber)
         winner = game.pop("winner")
         for player in game:
-            game[player]["team"] = getRoleTeam(game[player]["role"])
+            game[player]["team"] = await getRoleTeam(game[player]["role"])
         for player in game:
             won = game[player]["team"] == winner
             self.increaseGames(player, game[player]["role"], won)
@@ -208,8 +208,8 @@ class Elo(Cog):
             else:
                 eloDiff = self.getELoDiff(player, game, int(won))
                 newElo = game[player]["elo"] + eloDiff
-                setPlayerElo(player.id, newElo)
-        setGameToIsEvaluate(gameNumber)
+                await setPlayerElo(player.id, newElo)
+        await setGameToIsEvaluate(gameNumber)
         self.elo_calculated = True
 
     @commands.hybrid_command(name="calc_all_elo", aliases=["werteAlleAus", "waa", "cae"])
@@ -219,10 +219,10 @@ class Elo(Cog):
         Mit diesem Befehl können alle nicht ausgewerteten Spiele ausgewerted werden.
         """
         members: set[Member] = set()
-        gameNums = getUnevaluatedGames()
+        gameNums = await getUnevaluatedGames()
         for gameNum in gameNums:
             self.elo_calculated = False
-            game = list(getGameToEvaluate(gameNum).keys())
+            game = list(await getGameToEvaluate(gameNum).keys())
             game.remove("winner")
             members.update(game)
             await self.calculateElo(gameNum)

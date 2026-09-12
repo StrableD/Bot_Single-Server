@@ -16,7 +16,7 @@ class Next(Cog):
         self.night_roles = []
 
     def build_night_order(self):
-        cadre = getCurrentGameCadre(self.bot.guild)
+        cadre = await getCurrentGameCadre(self.bot.guild)
         roles_in_game = set(player_info["role"].lower() for player_info in cadre.values() if not player_info["dead"])
         
         ordered_roles = []
@@ -30,7 +30,7 @@ class Next(Cog):
         self.current_phase_index = 0
 
     @commands.hybrid_command(name="next_phase")
-    @commands.has_role(getRoleID("gamemaster"))
+    @commands.has_role(await getRoleID("gamemaster"))
     async def next_phase(self, ctx: Context):
         """
         Geht zur nächsten Nacht-Phase über und kündigt die nächste Rolle an.

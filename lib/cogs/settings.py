@@ -86,7 +86,7 @@ class Settings(Cog):
     async def getNewCadre(ctx: Context):
         content = []
         for channel in ctx.guild.get_channel(
-                getChannelID("default_cadre")
+                await getChannelID("default_cadre")
         ).text_channels:
             content.append((channel.name, channel.name[:2]))
         cadreSize = await takeSurvey(ctx, "Welche Kadergröße hättest du gerne", content)
@@ -122,7 +122,7 @@ class Settings(Cog):
         return squadDict
 
     @commands.hybrid_command(name="standardkader", aliases=["dafaultcadre", "defcadre"])
-    @has_role(getRoleID("gamemaster"))
+    @has_role(await getRoleID("gamemaster"))
     async def setDefaultCadre(self, ctx: Context):
         """
         Hiermit kannst du den Standard-Kader des Bots festlegen.
@@ -131,7 +131,7 @@ class Settings(Cog):
         """
         squadDict = await self.getNewCadre(ctx)
 
-        setDefaultCadre(squadDict)
+        await setDefaultCadre(squadDict)
 
         embed = Embed(
             title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
@@ -144,7 +144,7 @@ class Settings(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     @commands.hybrid_command(name="change", aliases=["ändern", "wechseln"])
-    @has_role(getRoleID("gamemaster"))
+    @has_role(await getRoleID("gamemaster"))
     async def changeCadre(self, ctx: Context, clear: Optional[str] = None):
         """
         Hiermit änderst du den aktuellen Spielekader.
@@ -155,7 +155,7 @@ class Settings(Cog):
         if bool(clear):
             if clear.lower() not in ("y", "j", "yes", "ja", "t", "true", "1", "on"):
                 return
-            setPlayingCadre({})
+            await setPlayingCadre({})
             await ctx.send(
                 "Der bisher ausgewählte Spielekader wurde gelöscht. Wenn gespielt wird, wird der Standardkader benutzt.",
                 delete_after=20.0,
@@ -164,7 +164,7 @@ class Settings(Cog):
 
         squadDict = await self.getNewCadre(ctx)
 
-        setPlayingCadre(squadDict)
+        await setPlayingCadre(squadDict)
 
         embed = Embed(
             title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
@@ -178,23 +178,23 @@ class Settings(Cog):
 
     # last stand with lukas
     @commands.hybrid_command(name="fill", aliases=["hinzufügen", "add"])
-    @has_role(getRoleID("gamemaster"))
+    @has_role(await getRoleID("gamemaster"))
     async def addCitizen(self, ctx: Context):
         """
         Zu dem aktuellen Spielekader wird ein Dorfbewohner hinzugefügt.
         Wenn es noch keinen Spielekader gibt, dann wird zu dem Standartkader ein Dorfbewohner hinzugefügt.
         Der Standartkader wird dann zum Spielekader.
         """
-        cadre = getCadre()
+        cadre = await getCadre()
         if "dorfbewohner" not in cadre:
             cadre["dorfbewohner"] = 1
         else:
             cadre["dorfbewohner"] += 1
-        setPlayingCadre(cadre)
+        await setPlayingCadre(cadre)
         await self.returnCadre(ctx)
 
     @commands.hybrid_command(name="minus", aliases=["entfernen", "sub"])
-    @has_role(getRoleID("gamemaster"))
+    @has_role(await getRoleID("gamemaster"))
     async def removeCitizen(self, ctx: Context):
         """
         Von dem aktuellen Kader wird ein Dorfbewohner entfernt.
@@ -202,7 +202,7 @@ class Settings(Cog):
         Der Standartkader wird dann zum Spielekader.
         Wenn es keine Dorfbewohner mehr gibt, dann passiert nichts.
         """
-        cadre = getCadre()
+        cadre = await getCadre()
         if "dorfbewohner" in cadre:
             cadre["dorfbewohner"] -= 1
             if cadre["dorfbewohner"] == 0:
@@ -215,7 +215,7 @@ class Settings(Cog):
             await ctx.send(
                 "Es gibt keine Dorfbewohner mehr im aktuellen Kader!", delete_after=20.0
             )
-        setPlayingCadre(cadre)
+        await setPlayingCadre(cadre)
         await self.returnCadre(ctx)
 
     @commands.hybrid_command(name="cadre", aliases=["kader"])
@@ -223,7 +223,7 @@ class Settings(Cog):
         """
         Gibt den aktuellen Kader zurück.
         """
-        cadre = getCadre()
+        cadre = await getCadre()
         embed = Embed(
             title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
         )
@@ -235,7 +235,7 @@ class Settings(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     @commands.hybrid_command(name="set_role", aliases=["gibRolle", "role"])
-    @has_role(getRoleID("gamemaster"))
+    @has_role(await getRoleID("gamemaster"))
     async def setPlayerRole(self, ctx: Context, player: Member, role: MyRoleConverter):
         await player.add_roles(role)
         await ctx.send(
@@ -250,7 +250,7 @@ class Settings(Cog):
         )
 
     @commands.hybrid_command(name="delete", aliases=["lösche", "del"])
-    @has_role(getRoleID("gamemaster"))
+    @has_role(await getRoleID("gamemaster"))
     async def deleteMessages(self, ctx: Context, number: Optional[int] = 1, channel: Optional[TextChannel] = None):
         """
         Löscht die angegebene Anzahl an Nachrichten im angegebenen Kanal.
@@ -272,16 +272,16 @@ class Settings(Cog):
         )
 
     @commands.hybrid_command(name="clear", aliases=["aufräumen", "leeren"])
-    @has_role(getRoleID("gamemaster"))
+    @has_role(await getRoleID("gamemaster"))
     async def clearGameChannels(self, ctx: Context):
         """
         Die Kanäle, in denen gespielt wird, werden aufgeräumt.
         Alle Nachrichten in den Kanälen unterhalb der Kategorie Morbach werden geleert.
         Ausgenommen sind die Bot-Kanäle
         """
-        game_category = ctx.guild.get_channel(getChannelID("game_category"))
+        game_category = ctx.guild.get_channel(await getChannelID("game_category"))
         bot_channels = tuple(
-            ctx.guild.get_channel(getChannelID(x))
+            ctx.guild.get_channel(await getChannelID(x))
             for x in ("bot_channel", "music_channel")
         )
         numMsgs = 0
@@ -299,7 +299,7 @@ class Settings(Cog):
                     for message in history:
                         await message.delete()
                         numMsgs += 1
-        loveChannel = ctx.guild.get_channel(getChannelID("lovebirds"))
+        loveChannel = ctx.guild.get_channel(await getChannelID("lovebirds"))
         removed_players = []
         for member in filter(
                 lambda player: type(player) == Member and player != ctx.guild.owner,

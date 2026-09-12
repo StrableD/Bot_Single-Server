@@ -1,37 +1,48 @@
 import json
-import sqlite3
-from typing import Union
-from lib.db.db import MYDB, with_commit
+from lib.db.db import AsyncSessionLocal
+from lib.db.models import GameCadre
 from lib.helper.utils import member_to_json, MemberJsonDecoder
+from sqlalchemy import select
 
-def get_cadre(cadre_type: str, guild=None) -> dict:
-    row = MYDB.execute("SELECT data FROM game_cadre WHERE cadre_type = ?", (cadre_type,)).fetchone()
-    if row:
-        decoder = MemberJsonDecoder(guild=guild)
-        return decoder.decode(row[0])
-    return {}
+async def get_cadre(cadre_type: str, guild=None) -> dict:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(GameCadre).where(GameCadre.cadre_type == cadre_type))
+        cadre = result.scalar_one_or_none()
+        if cadre and cadre.data:
+            decoder = MemberJsonDecoder(guild=guild)
+            return decoder.decode(json.dumps(cadre.data)) if isinstance(cadre.data, dict) else decoder.decode(cadre.data)
+        return {}
 
-@with_commit
-def set_cadre(cadre_type: str, data: dict):
-    MYDB.execute("INSERT OR REPLACE INTO game_cadre (cadre_type, data) VALUES (?, ?)", (cadre_type, json.dumps(member_to_json(data))))
+async def set_cadre(cadre_type: str, data: dict):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(GameCadre).where(GameCadre.cadre_type == cadre_type))
+        cadre = result.scalar_one_or_none()
+        json_data = member_to_json(data)
+        
+        if cadre:
+            cadre.data = json_data
+        else:
+            new_cadre = GameCadre(cadre_type=cadre_type, data=json_data)
+            session.add(new_cadre)
+        await session.commit()
 
-def getCadre(guild=None) -> dict:
-    playing = get_cadre("playing", guild)
+async def getCadre(guild=None) -> dict:
+    playing = await get_cadre("playing", guild)
     if playing:
         return playing
-    return get_cadre("default", guild)
+    return await get_cadre("default", guild)
 
-def setDefaultCadre(cadre: dict):
-    set_cadre("default", cadre)
+async def setDefaultCadre(cadre: dict):
+    await set_cadre("default", cadre)
     return True
 
-def setPlayingCadre(cadre: dict):
-    set_cadre("playing", cadre)
+async def setPlayingCadre(cadre: dict):
+    await set_cadre("playing", cadre)
     return True
 
-def getCurrentGameCadre(guild=None) -> dict:
-    return get_cadre("currentgame", guild)
+async def getCurrentGameCadre(guild=None) -> dict:
+    return await get_cadre("currentgame", guild)
 
-def setCurrentGameCadre(cadre: dict):
-    set_cadre("currentgame", cadre)
+async def setCurrentGameCadre(cadre: dict):
+    await set_cadre("currentgame", cadre)
     return True

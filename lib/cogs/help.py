@@ -89,7 +89,7 @@ class Help(Cog):
         embed.add_field(name="Beschreibung des Befehls", value=cmd.help)
         await ctx.send(embed=embed, delete_after=20.0)
 
-    @command(name="help", aliases=["hilfe"])
+    @commands.hybrid_command(name="help", aliases=["hilfe"])
     async def showHelp(self, ctx: Context, cmd: Optional[str]):
         """
         Zeigt diese Antwort.
@@ -144,7 +144,7 @@ class Help(Cog):
                     delete_after=10.0,
                 )
 
-    @command(name="invite", aliases=["einladen", "in"])
+    @commands.hybrid_command(name="invite", aliases=["einladen", "in"])
     @check(is_guild_owner)
     async def invitePlayer(self, ctx: Context, player: User):
         """
@@ -152,7 +152,7 @@ class Help(Cog):
         Hierfür wird der Discordname und der Diskriminator eingegeben werden.
         ``player``: Der Spieler in Form von Name#Diskriminator
         """
-        inviteChannel = ctx.guild.get_channel(getChannelID("invites"))
+        inviteChannel = ctx.guild.get_channel(await getChannelID("invites"))
         invite = await inviteChannel.create_invite(
             max_age=10800,
             max_uses=1,
@@ -173,16 +173,16 @@ class Help(Cog):
         else:
             raise exc
 
-    @command(name="newseason", aliases=["season"])
+    @commands.hybrid_command(name="newseason", aliases=["season"])
     @check(is_guild_owner)
     async def invitePlayer(self, ctx: Context):
         self.bot._season_date = date.today()
-        resetSeason()
+        await resetSeason()
         await ctx.send(
             """__Die Saison wurde beendet und eine neue angefangen.__\n
             \nDie gespielten Spiele und die Elo wurden zurückgesetzt""")
 
-    @command(name="update")
+    @commands.hybrid_command(name="update")
     @check(lambda ctx: ctx.author.id == ctx.bot.owner_id)
     async def updateManually(self, ctx: Context):
         self.bot.update_bot()
@@ -194,5 +194,5 @@ class Help(Cog):
             self.bot.cogs_ready.ready_up("help")
 
 
-def setup(bot: My_Bot):
-    bot.add_cog(Help(bot))
+async def setup(bot: My_Bot):
+    await bot.add_cog(Help(bot))

@@ -84,8 +84,12 @@ class Settings(Cog):
     cadre_group = app_commands.Group(name="cadre", description="Cadre management")
 
     async def cadreLength(self):
-        game = self.bot.get_cog("Game")
-        return await game.cadreLength()
+        from lib.db.cadre_db import getCadre
+        cadre = await getCadre()
+        length = 0
+        for num in cadre.values():
+            length += num
+        return length
 
     @staticmethod
     async def getNewCadre(interaction: discord.Interaction):

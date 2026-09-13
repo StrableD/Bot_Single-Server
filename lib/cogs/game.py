@@ -81,6 +81,26 @@ class LobbyView(discord.ui.View):
             
             # To-Do: Assign roles, move to voice channels
 
+
+    @discord.ui.button(label="Cancel Lobby", style=discord.ButtonStyle.danger, custom_id="lobby_cancel")
+    async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        async with AsyncSessionLocal() as session:
+            lobby = await session.get(Lobby, self.lobby_id)
+            if not lobby or not lobby.is_active:
+                await interaction.response.send_message("This lobby is already closed or invalid.", ephemeral=True)
+                return
+            
+            if interaction.user.id != lobby.gamemaster_id and interaction.user.id != interaction.guild.owner_id:
+                await interaction.response.send_message("Only the Gamemaster who created the lobby can cancel it.", ephemeral=True)
+                return
+            
+            lobby.is_active = False
+            await session.commit()
+            
+            for child in self.children:
+                child.disabled = True
+            await interaction.response.edit_message(content="❌ Lobby cancelled by Gamemaster.", embed=None, view=self)
+
 # --- Cog ---
 
 class Game(Cog):

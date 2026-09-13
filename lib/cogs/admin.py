@@ -15,10 +15,9 @@ class SetupWizard(discord.ui.View):
     def __init__(self, interaction: discord.Interaction):
         super().__init__(timeout=900)
         self.original_interaction = interaction
-        # Roles we need to map
         self.pending_roles = ["Gamemaster"] + ALL_ROLES
         self.current_idx = 0
-        self.mode = None # "auto" or "manual"
+        self.mode = None
         
     async def start(self):
         embed = discord.Embed(
@@ -30,6 +29,7 @@ class SetupWizard(discord.ui.View):
         )
         btn_auto = discord.ui.Button(label="Automatic", style=discord.ButtonStyle.green)
         btn_manual = discord.ui.Button(label="Manual", style=discord.ButtonStyle.blurple)
+        btn_cancel = discord.ui.Button(label="Cancel Setup", style=discord.ButtonStyle.danger, row=2)
         
         async def auto_cb(i: discord.Interaction):
             self.mode = "auto"
@@ -43,11 +43,16 @@ class SetupWizard(discord.ui.View):
             await i.response.edit_message(content="Starting Manual Setup...", embed=None, view=self)
             await self.next_step(i)
             
+        async def cancel_cb(i: discord.Interaction):
+            await i.response.edit_message(content="❌ Setup Cancelled.", embed=None, view=None)
+            
         btn_auto.callback = auto_cb
         btn_manual.callback = manual_cb
+        btn_cancel.callback = cancel_cb
         
         self.add_item(btn_auto)
         self.add_item(btn_manual)
+        self.add_item(btn_cancel)
         
         await self.original_interaction.followup.send(embed=embed, view=self, ephemeral=True)
 
@@ -78,14 +83,17 @@ class SetupWizard(discord.ui.View):
             await session.commit()
 
     async def handle_auto_step(self, interaction: discord.Interaction, role_name: str):
-        # Try to guess
         guild = interaction.guild
         guessed_role = None
         for r in guild.roles:
-            # Simple string match
             if role_name.lower() in r.name.lower():
                 guessed_role = r
                 break
+                
+        btn_cancel = discord.ui.Button(label="Cancel Setup", style=discord.ButtonStyle.danger, row=2)
+        async def cancel_cb(i: discord.Interaction):
+            await i.response.edit_message(content="❌ Setup Cancelled.", embed=None, view=None)
+        btn_cancel.callback = cancel_cb
                 
         if guessed_role:
             embed = discord.Embed(title=f"Role Setup: {role_name}", description=f"I guessed this matches your existing Discord role: {guessed_role.mention}\nIs this correct?", color=discord.Color.gold())
@@ -108,6 +116,7 @@ class SetupWizard(discord.ui.View):
             
             self.add_item(btn_yes)
             self.add_item(btn_no)
+            self.add_item(btn_cancel)
             
             if interaction.response.is_done():
                 await interaction.edit_original_response(embed=embed, view=self)
@@ -122,7 +131,11 @@ class SetupWizard(discord.ui.View):
         
         btn_create = discord.ui.Button(label="Yes, Create It", style=discord.ButtonStyle.green)
         btn_skip = discord.ui.Button(label="Skip", style=discord.ButtonStyle.secondary)
+        btn_cancel = discord.ui.Button(label="Cancel Setup", style=discord.ButtonStyle.danger, row=2)
         
+        async def cancel_cb(i: discord.Interaction):
+            await i.response.edit_message(content="❌ Setup Cancelled.", embed=None, view=None)
+            
         async def create_cb(i: discord.Interaction):
             await i.response.defer()
             try:
@@ -135,15 +148,17 @@ class SetupWizard(discord.ui.View):
             
         async def skip_cb(i: discord.Interaction):
             await i.response.defer()
-            # Save as stub (id=0)
             await self.save_role_to_db(role_name, role_name, 0)
             self.current_idx += 1
             await self.next_step(i)
             
         btn_create.callback = create_cb
         btn_skip.callback = skip_cb
+        btn_cancel.callback = cancel_cb
+        
         self.add_item(btn_create)
         self.add_item(btn_skip)
+        self.add_item(btn_cancel)
         
         if interaction.response.is_done():
             await interaction.edit_original_response(embed=embed, view=self)
@@ -155,9 +170,18 @@ class SetupWizard(discord.ui.View):
         
         select_menu = discord.ui.RoleSelect(placeholder="Choose a role...", min_values=1, max_values=1)
         btn_skip = discord.ui.Button(label="Skip", style=discord.ButtonStyle.secondary, row=1)
+        btn_cancel = discord.ui.Button(label="Cancel Setup", style=discord.ButtonStyle.danger, row=1)
         
         async def select_cb(i: discord.Interaction):
             selected_role = select_menu.values[0]
+            # Check if this role is already mapped in the database
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(select(DBRole).where(DBRole.id == selected_role.id))
+                existing = res.scalar_one_or_none()
+                if existing and existing.id != 0 and existing.name_bot != role_name.lower().replace("-", "").replace(" ", ""):
+                    await i.response.send_message(f"Error: The role {selected_role.mention} is already mapped to {existing.name_guild}!", ephemeral=True)
+                    return
+            
             await self.save_role_to_db(role_name, selected_role.name, selected_role.id)
             self.current_idx += 1
             await i.response.defer()
@@ -169,11 +193,16 @@ class SetupWizard(discord.ui.View):
             await i.response.defer()
             await self.next_step(i)
             
+        async def cancel_cb(i: discord.Interaction):
+            await i.response.edit_message(content="❌ Setup Cancelled.", embed=None, view=None)
+            
         select_menu.callback = select_cb
         btn_skip.callback = skip_cb
+        btn_cancel.callback = cancel_cb
         
         self.add_item(select_menu)
         self.add_item(btn_skip)
+        self.add_item(btn_cancel)
         
         if interaction.response.is_done():
             await interaction.edit_original_response(embed=embed, view=self)

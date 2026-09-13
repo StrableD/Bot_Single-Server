@@ -1,6 +1,5 @@
 import json
 
-from discord.ext.commands import check
 from lib.bot import My_Bot
 from random import choice
 from numpy import average, e
@@ -17,9 +16,10 @@ from lib.db.db import (
     setGameToIsEvaluate,
     setPlayerElo
 )
+import discord
 from discord import Embed, Member, Colour
-from discord.ext import commands
-from discord.ext.commands import Cog, hybrid_command, Greedy, Context
+from discord import app_commands
+from discord.ext.commands import Cog
 
 
 class Elo(Cog):
@@ -43,88 +43,55 @@ class Elo(Cog):
     def set_calculated_to_false(self):
         self.elo_calculated = False
 
-    @commands.hybrid_command(name="elo")
-    async def getPlayerElo(self, ctx: Context, players: Greedy[Member]):
+    @app_commands.command(name="elo", description="Gibt die Elo und den Rang des Autors oder des gegebenen Spielers zurück.")
+    async def getPlayerElo(self, interaction: discord.Interaction, player: discord.Member = None):
         """
         Gibt die Elo und den Rang des Autors oder des gegebenen Spielers zurück.
         Nur ein Spielleiter kann die Infos für einen anderen Spieler anfordern.
-        ``players``: Eine Liste an Spielern mit Leerzeichen getrennt (optional)
         """
+        await interaction.response.defer(ephemeral=True)
         leagues = await getLeagues()
-        if players == [] and (elo := await getElo(ctx.author.id)) is not None:
-            embed = Embed(title="ELO Info", colour=Colour.from_rgb(154, 7, 125))
-            embed.set_thumbnail(url=ctx.author.avatar_url)
-            league = ""
-            for name, elo_range in leagues.items():
-                if elo_range[0] <= elo <= elo_range[1]:
-                    league = name
-            embed.add_field(
-                name=ctx.author.display_name,
-                value=f"Die ELO beträgt {elo}\nDaraus folgt der Rang **{league}**",
-                inline=True,
-            )
-            embed.add_field(name="**Server**", value=ctx.guild.name, inline=False)
-            await ctx.author.send(embed=embed, delete_after=45.0)
-        elif players != []:
+        
+        target_player = player or interaction.user
+        
+        if target_player != interaction.user:
             try:
                 gm_role_id = await getRoleID("gamemaster")
             except ValueError:
                 gm_role_id = None
                 
-            if not gm_role_id or not any(role.id == gm_role_id for role in ctx.author.roles):
-                raise NoPerms("Adminrechte")
-        elif players != [] and all(elo := tuple(await getElo(player.id) for player in players)):
-            embed = Embed(title="ELO Info", colour=Colour.from_rgb(154, 7, 125))
-            embed.set_thumbnail(url=choice(players).avatar_url)
-            fields = []
-            for player in players:
-                league = ""
-                for name, elo_range in leagues.items():
-                    if elo_range[0] <= elo[players.index(player)] <= elo_range[1]:
-                        league = name
-                fields.append(
-                    (player.display_name, (elo[players.index(player)], league), True)
-                )
+            if not gm_role_id or not any(role.id == gm_role_id for role in interaction.user.roles):
+                await interaction.followup.send("Du kannst keine Elo Infos zu anderen Personen holen, da dir folgende Berechtigung fehlt: Adminrechte", ephemeral=True)
+                return
 
-            for name, value, inline in fields:
-                embed.add_field(
-                    name=name,
-                    value=f"Die ELO beträgt {value[0]}\nDaraus folgt der Rang {value[1]}",
-                    inline=inline,
-                )
-            await ctx.send(embed=embed, delete_after=45.0)
+        elo = await getElo(target_player.id)
+        if elo is not None:
+            embed = Embed(title="ELO Info", colour=Colour.from_rgb(154, 7, 125))
+            avatar_url = target_player.display_avatar.url if hasattr(target_player, 'display_avatar') else target_player.avatar_url
+            embed.set_thumbnail(url=avatar_url)
+            league = ""
+            for name, elo_range in leagues.items():
+                if elo_range[0] <= elo <= elo_range[1]:
+                    league = name
+            embed.add_field(
+                name=target_player.display_name,
+                value=f"Die ELO beträgt {elo}\nDaraus folgt der Rang **{league}**",
+                inline=True,
+            )
+            embed.add_field(name="**Server**", value=interaction.guild.name, inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=(target_player == interaction.user))
         else:
-            player = ctx.author if players == [] else players
             embed = Embed(
                 title="Es gibt keine ELO Info",
                 description="Grund: Bisher nicht implementiert oder du hast einfach keine ^^. \nBitte versuche es mit einer anderen Anfrage",
                 colour=Colour.from_rgb(255, 0, 0),
             )
-            player_without = []
-            if isinstance(player, Member):
-                player_without.append(player.display_name)
-            else:
-                for p in player:
-                    if not await getElo(p.id):
-                        player_without.append(p.display_name)
             embed.add_field(
-                name="Diese Spieler haben keine ELO"
-                if len(player_without) != 1
-                else "Dieser Spieler hat keine ELO",
-                value=",".join(player_without),
+                name="Dieser Spieler hat keine ELO",
+                value=target_player.display_name,
                 inline=True,
             )
-            await ctx.send(embed=embed, delete_after=45.0)
-
-    @getPlayerElo.error
-    async def getPlayerEloError(self, ctx: Context, exc):
-        if isinstance(exc, NoPerms):
-            await ctx.send(
-                f"Du kannst keine Elo Infos zu anderen Personen holen, da dir folgende Berechtigung fehlt: {exc.message}",
-                delete_after=30.0,
-            )
-        else:
-            raise exc
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
     @staticmethod
     def eloDiff(teamElo: int, enemyElo: int, result: int):
@@ -211,13 +178,14 @@ class Elo(Cog):
         await setGameToIsEvaluate(gameNumber)
         self.elo_calculated = True
 
-    @commands.hybrid_command(name="calc_all_elo", aliases=["werteAlleAus", "waa", "cae"])
-    @check(is_guild_owner)
-    async def calculateAllElo(self, ctx: Context):
-        """
-        Mit diesem Befehl können alle nicht ausgewerteten Spiele ausgewerted werden.
-        """
-        members: set[Member] = set()
+    @app_commands.command(name="calc_all_elo", description="Wertet alle nicht ausgewerteten Spiele aus.")
+    async def calculateAllElo(self, interaction: discord.Interaction):
+        if interaction.user != interaction.guild.owner:
+            await interaction.response.send_message("Nur der Serverbesitzer kann diesen Befehl ausführen.", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        members: set[discord.Member] = set()
         gameNums = await getUnevaluatedGames()
         for gameNum in gameNums:
             self.elo_calculated = False
@@ -226,14 +194,19 @@ class Elo(Cog):
             members.update(game)
             await self.calculateElo(gameNum)
 
-        embed = Embed(title="Elo ausgewerted",
+        embed = Embed(title="Elo ausgewertet",
                       description="Die Elo der noch nicht ausgewerteten Spiele wurde berechnet",
                       colour=Colour.from_rgb(0, 0, 0))
-        embed.add_field(name="Anzahl ausgewerteter Spiele", value=sum(gameNums))
+        embed.add_field(name="Anzahl ausgewerteter Spiele", value=str(len(gameNums)))
+        
+        changed_players = []
+        for i, m in enumerate(list(members)):
+            changed_players.append(m.display_name if i % 2 != 0 else f"\t{m.display_name}")
+            
         embed.add_field(name="Von diesen Spielern wurde die Elo geändert",
-                        value="\n".join(map(lambda x: x.display_name if [members].index(x) % 2 != 0 else f"\t{x.display_name}", members)),
+                        value="\n".join(changed_players) or "Niemand",
                         inline=False)
-        await ctx.send(embed=embed, delete_after=100.0)
+        await interaction.followup.send(embed=embed)
 
     @Cog.listener()
     async def on_ready(self):

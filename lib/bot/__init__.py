@@ -122,7 +122,6 @@ class My_Bot(Bot):
                 await self.invoke(ctx)
 
     async def on_connect(self):
-        await super().on_connect()
         self.logger.info("bot connected")
         self.guild = self.guilds[0] if self.guilds else None
         await self.update_bot_attr()

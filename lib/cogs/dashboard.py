@@ -4,7 +4,7 @@ from discord.ext.commands import Cog, Context
 from discord.ui import View, Button
 from lib.bot import My_Bot
 from lib.db.cadre_db import getCurrentGameCadre
-from lib.db.db import getRoleID
+from lib.helper.checks import is_gamemaster
 
 class GamemasterDashboard(View):
     def __init__(self, bot):
@@ -59,12 +59,9 @@ class Dashboard(Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="dashboard")
+    @is_gamemaster()
     async def spawn_dashboard(self, ctx: Context):
         """Spawns the live-updating Gamemaster Dashboard"""
-        gm_role_id = await getRoleID("gamemaster")
-        if not any(role.id == gm_role_id for role in ctx.author.roles):
-            await ctx.send("You do not have permission to use this command.", ephemeral=True)
-            return
 
         channel_name = ctx.channel.name.lower()
         if "bot" not in channel_name and "gm" not in channel_name and "gamemaster" not in channel_name:

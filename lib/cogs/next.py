@@ -1,9 +1,11 @@
 from discord.ext import commands
 from discord.ext.commands import Cog, Context
 from lib.bot import My_Bot
-from lib.helper.constants import TIMINGS, getRoleID
+from lib.helper.constants import TIMINGS
 from lib.helper.errors import NoPerms
+from lib.db.db import getRoleID
 from lib.db.cadre_db import getCurrentGameCadre
+from lib.helper.checks import is_gamemaster
 
 class Next(Cog):
     """
@@ -15,28 +17,30 @@ class Next(Cog):
         self.current_phase_index = 0
         self.night_roles = []
 
-    def build_night_order(self):
+    async def build_night_order(self):
         cadre = await getCurrentGameCadre(self.bot.guild)
         roles_in_game = set(player_info["role"].lower() for player_info in cadre.values() if not player_info["dead"])
         
         ordered_roles = []
         for role, timing in TIMINGS.items():
             # timing is (nacht, durchgehend, abhängig)
-            # We want roles that wake up at night
-            if role in roles_in_game and timing[0] in (1, 2):
-                ordered_roles.append(role)
+            if timing[0] != -1:
+                # Basic check if role is in game (would need real game logic for dependencies)
+                if role in roles_in_game:
+                    ordered_roles.append((role, timing[0]))
         
-        self.night_roles = ordered_roles
+        ordered_roles.sort(key=lambda x: x[1])
+        self.night_roles = [r[0] for r in ordered_roles]
         self.current_phase_index = 0
 
     @commands.hybrid_command(name="next_phase")
-    @commands.has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def next_phase(self, ctx: Context):
         """
         Geht zur nächsten Nacht-Phase über und kündigt die nächste Rolle an.
         """
         if not self.night_roles:
-            self.build_night_order()
+            await self.build_night_order()
             
         if not self.night_roles:
             await ctx.send("Keine Rollen in dieser Nacht aktiv.", ephemeral=True)

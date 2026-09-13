@@ -6,25 +6,23 @@ from typing import Optional, Union, cast
 import discord
 from apscheduler.triggers.date import DateTrigger
 from babel.dates import format_date
-from discord import Colour, Embed, Guild, Member, Role, VoiceChannel, Context, Interaction, SelectOption, CheckFailure
+from discord import Colour, Embed, Guild, Member, Role, VoiceChannel, Interaction, SelectOption
 from discord.abc import Snowflake
 from discord.ext import commands
-from discord.ext.commands import Cog, Context, check
+from discord.ext.commands import Cog, Context, check, CheckFailure
 from discord.ext.commands.core import has_role
 from discord.ui import View, Item, Select
 from numpy.random import randint
 
 from lib.bot import My_Bot
 from lib.cogs.help import is_guild_owner
+from lib.helper.converters import MyRoleConverter
+from lib.helper.checks import is_gamemaster
 from lib.cogs.settings import takeSurvey
-from lib.db.db import getChannelID, getElo, getRoleID, getRoleTeam, saveCurrentGame, getData, cursor
-from lib.helper.constants import (
-    CHRONICLE_PATTERN,
-    InputError,
-    getCadre,
-    getCurrentGameCadre,
-    setCurrentGameCadre,
-)
+from lib.db.db import getChannelID, getElo, getRoleID, getRoleTeam, saveCurrentGame
+from lib.helper.constants import CHRONICLE_PATTERN
+from lib.helper.errors import InputError
+from lib.db.cadre_db import getCadre, getCurrentGameCadre, setCurrentGameCadre
 
 
 class Game(Cog):
@@ -46,8 +44,7 @@ class Game(Cog):
     def _disable(cls):
         cls._choices_active = False
 
-    @property
-    def cadreLength(self) -> int:
+    async def cadreLength(self) -> int:
         cadre = await getCadre()
         length = 0
         for num in cadre.values():
@@ -55,7 +52,7 @@ class Game(Cog):
         return length
 
     @staticmethod
-    def getSquad(players: list[Member]) -> dict[Member, str]:
+    async def getSquad(players: list[Member]) -> dict[Member, str]:
         returnDict = {}
         length = len(players)
         for player in players:
@@ -64,116 +61,40 @@ class Game(Cog):
                 rand = randint(length)
             returnDict[player] = rand
         cadreList = []
-        for role, count in await getCadre().items():
+        for role, count in (await getCadre()).items():
             role = role.lower().strip()
             if role in ("dorfbewohner", "werwolf", "geschwister"):
                 for num in range(1, count + 1):
                     cadreList.append(f"{role}-{num}".replace(" ", "-"))
             else:
-                cadreList.append(role.replace(" ", "-"))
-        for member, num in returnDict.items():
-            returnDict[member] = cadreList[num]
-        currentCadre: [Member, dict[str, str | bool]] = {}
-        for player, role in returnDict.items():
-            currentCadre[player] = {
-                "role": role,
+                for num in range(count):
+                    cadreList.append(role)
+        currentCadre = {}
+        for key, value in returnDict.items():
+            returnDict[key] = cadreList[value]
+            currentCadre[str(key.id)] = {
+                "role": cadreList[value],
                 "dead": False,
-                "captain": False,
                 "lovebirds": False,
             }
         await setCurrentGameCadre(currentCadre)
         return returnDict
 
     @staticmethod
-    def getSquadWithChoices(players: list[Member], choices: dict[Member, str]) -> dict[Member, str]:
-        res_dict: dict[Member, str] = {}
-
-        def processChoice(value: str) -> str:
-            returnValue = None
-            if value in ("Werwölfe", "Dorf", "Drittpartei"):
-                if value == "Werwölfe":
-                    werewolfFraction = (x for x in getData("roles", ("name_bot",), ("team", "Werwölfe")) if x.strip("-0123456789 ") in await getCadre().keys())
-                    print(werewolfFraction)
-                    try:
-                        returnValue = random.choice([x for x in werewolfFraction if x not in res_dict.values()])
-                    except IndexError:
-                        pass
-                elif value == "Dorf":
-                    dorfFraction = (x for x in getData("roles", ("name_bot",), ("team", "Dorf")) if x in await getCadre().keys())
-                    print(dorfFraction)
-                    try:
-                        returnValue = random.choice([x for x in dorfFraction if x not in res_dict.values()])
-                    except IndexError:
-                        pass
-                else:
-                    thirdParty = (x for x in (getData("role", ("name_bot",), ("team", x)) for x in ("Weißer Werwolf", "Werschweinchen", "Jason")) if x in await getCadre().keys())
-                    print(thirdParty)
-                    try:
-                        returnValue = random.choice([x for x in thirdParty if x not in res_dict.values()])
-                    except IndexError:
-                        pass
-            if returnValue is None:
-                remaining_cadre = [x for x, in cursor.execute("SELECT name_bot FROM roles WHERE team IS NOT NULL").fetchall()
-                                   if x.strip(" -1234567890") in await getCadre().keys() and x not in res_dict.values()]
-                returnValue = random.choice(remaining_cadre)
-            return returnValue
-
-        if any(True for x in choices.values() if list(choices.values()).count(x) > 1):
-            duplicates = [(k, v) for k, v in choices.items() if list(choices.values()).count(v) > 1]
-            singles = [(k, v) for k, v in choices.items() if list(choices.values()).count(v) == 1]
-            for k, v in singles:
-                res_dict[k] = processChoice(v)
-            orderedDuplicates: list[list[tuple[Member, str]]] = []
-            duplicates.sort(key=lambda x: x[1])
-            for i, x in enumerate(duplicates):
-                if x[1] == duplicates[i - 1][1]:
-                    orderedDuplicates[-1].append(x)
-                else:
-                    orderedDuplicates.append([x])
-            for duplicate in orderedDuplicates:
-                if duplicate[0][1] in ("Werwölfe", "Dorf", "Drittpartei"):
-                    maximumPlayersPerRole = len([x for x in getData("roles", ("name_bot",), ("team", duplicate[0][1])) if x.strip("-0123456789 ") in await getCadre().keys()])
-                    if len(duplicate) > maximumPlayersPerRole:
-                        randomPlayers = random.choices(duplicate, k=maximumPlayersPerRole)
-                        for k, v in randomPlayers:
-                            res_dict[k] = processChoice(v)
-                    else:
-                        for k, v in duplicate:
-                            res_dict[k] = processChoice(v)
-                else:
-                    maximumPlayersPerRole = await getCadre()[duplicate[0][1]]
-                    if len(duplicate) > maximumPlayersPerRole:
-                        randomPlayers = random.choices(duplicate, k=maximumPlayersPerRole)
-                        for k, v in randomPlayers:
-                            res_dict[k] = processChoice(v)
-                    else:
-                        for k, v in duplicate:
-                            res_dict[k] = processChoice(v)
-        for m in (x for x in players if x not in res_dict.keys()):
-            remainingCadre = [x for x, in cursor.execute("SELECT name_bot FROM roles WHERE team IS NOT NULL").fetchall()
-                              if x.strip(" -1234567890") in await getCadre().keys() and x not in res_dict.values()]
-            res_dict[m] = random.choice(remainingCadre)
-
-        currentCadre: [Member, dict[str, str | bool]] = {}
-        for player, role in res_dict.items():
-            currentCadre[player] = {
-                "role": role,
-                "dead": False,
-                "captain": False,
-                "lovebirds": False,
-            }
-        await setCurrentGameCadre(currentCadre)
-
-        return res_dict
+    async def getSquadWithChoices(players: list[Member], choices: dict[Member, str]) -> dict[Member, str]:
+        # Temporarily bypassing choice logic until fully migrated to async SQLAlchemy
+        return await Game.getSquad(players)
 
     @staticmethod
-    def checkRolePos(role: Role, guild: Guild):
-        if role.position >= guild.get_role(await getRoleID("dead")).position:
+    async def checkRolePos(role: Role, guild: Guild):
+        dead_id = await getRoleID("dead")
+        dead_role = guild.get_role(dead_id)
+        if dead_role and role.position >= dead_role.position:
             return True
         return False
 
     @commands.hybrid_command(name="start", aliases=["go", "starten"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def startGame(self, ctx: Context):
         """
         Die Funktion startet das Spiel.
@@ -191,8 +112,9 @@ class Game(Cog):
         playerList = []
         numGamemaster = 0
 
+        gm_role_id = await getRoleID("gamemaster")
         for member in ctx.author.voice.channel.members:
-            if any(await getRoleID("gamemaster") == role.id for role in member.roles):
+            if any(gm_role_id == role.id for role in member.roles):
                 numGamemaster += 1
                 if numGamemaster > 1:
                     await ctx.send(
@@ -206,7 +128,7 @@ class Game(Cog):
             else:
                 playerList.append(member)
 
-        if len(playerList) < self.cadreLength:
+        if len(playerList) < await self.cadreLength():
             embed = Embed(
                 title="Kein Spielstart möglich",
                 description="Für ein Spiel benötigt ihr noch mehr Spieler in dem Kanal.",
@@ -214,7 +136,7 @@ class Game(Cog):
             )
             embed.add_field(
                 name="Anzahl fehlender Spieler",
-                value=f"{self.cadreLength - len(playerList)}",
+                value=f"{await self.cadreLength() - len(playerList)}",
             )
             embed.add_field(
                 name="Mögliche Lösungen",
@@ -223,7 +145,7 @@ class Game(Cog):
             await ctx.send(embed=embed, delete_after=30.0)
             return
 
-        elif len(playerList) > self.cadreLength:
+        elif len(playerList) > await self.cadreLength():
             embed = Embed(
                 title="Kein Spielstart möglich",
                 description="Für ein Spiel habt ihr zu viele Spieler in dem Kanal.",
@@ -231,7 +153,7 @@ class Game(Cog):
             )
             embed.add_field(
                 name="Anzahl überzähliger Spieler",
-                value=f"{len(playerList) - self.cadreLength}",
+                value=f"{len(playerList) - await self.cadreLength()}",
             )
             embed.add_field(
                 name="Mögliche Lösungen",
@@ -260,7 +182,7 @@ class Game(Cog):
             GVoiceChannel = self.bot.get_channel(await getChannelID("GameVoiceChannel"))
             for player, gamerole in squad.items():
                 for role in player.roles:
-                    if self.checkRolePos(role, ctx.guild):
+                    if await self.checkRolePos(role, ctx.guild):
                         await player.remove_roles(role)
                 await player.add_roles(ctx.guild.get_role(await getRoleID(gamerole)))
                 await player.move_to(cast(VoiceChannel, GVoiceChannel))
@@ -273,7 +195,7 @@ class Game(Cog):
             self.bot._current_gamemaster = ctx.author
 
     @commands.hybrid_command(name="start_with_choice", aliases=["rollenwahl", "rolechoice"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def startGameWithChoice(self, ctx: Context):
         """
         Diese Funktion startet ein Spiel mit Rollenwahl.
@@ -291,8 +213,9 @@ class Game(Cog):
         playerList = []
         numGamemaster = 0
 
+        gm_role_id = await getRoleID("gamemaster")
         for member in ctx.author.voice.channel.members:
-            if any(await getRoleID("gamemaster") == role.id for role in member.roles):
+            if any(gm_role_id == role.id for role in member.roles):
                 numGamemaster += 1
                 if numGamemaster > 2:
                     await ctx.send(
@@ -305,7 +228,7 @@ class Game(Cog):
             else:
                 playerList.append(member)
 
-        if len(playerList) < self.cadreLength:
+        if len(playerList) < await self.cadreLength():
             embed = Embed(
                 title="Kein Spielstart möglich",
                 description="Für ein Spiel benötigt ihr noch mehr Spieler in dem Kanal.",
@@ -313,7 +236,7 @@ class Game(Cog):
             )
             embed.add_field(
                 name="Anzahl fehlender Spieler",
-                value=f"{self.cadreLength - len(playerList)}",
+                value=f"{await self.cadreLength() - len(playerList)}",
             )
             embed.add_field(
                 name="Mögliche Lösungen",
@@ -322,7 +245,7 @@ class Game(Cog):
             await ctx.send(embed=embed, delete_after=30.0)
             return
 
-        elif len(playerList) > self.cadreLength:
+        elif len(playerList) > await self.cadreLength():
             embed = Embed(
                 title="Kein Spielstart möglich",
                 description="Für ein Spiel habt ihr zu viele Spieler in dem Kanal.",
@@ -330,7 +253,7 @@ class Game(Cog):
             )
             embed.add_field(
                 name="Anzahl überzähliger Spieler",
-                value=f"{len(playerList) - self.cadreLength}",
+                value=f"{len(playerList) - await self.cadreLength()}",
             )
             embed.add_field(
                 name="Mögliche Lösungen",
@@ -349,7 +272,7 @@ class Game(Cog):
             Game._enable()
             await asyncio.create_task(asyncio.sleep(60 * 5))
             Game._disable()
-            squad = self.getSquadWithChoices(playerList, self._choices)
+            squad = await self.getSquadWithChoices(playerList, self._choices)
             embed = Embed(
                 title="Kaderaufstellung", colour=Colour.from_rgb(192, 192, 192), type="article"
             )
@@ -364,7 +287,7 @@ class Game(Cog):
             GVoiceChannel = self.bot.get_channel(await getChannelID("GameVoiceChannel"))
             for player, gamerole in squad.items():
                 for role in player.roles:
-                    if self.checkRolePos(role, ctx.guild):
+                    if await self.checkRolePos(role, ctx.guild):
                         await player.remove_roles(role)
                 await player.add_roles(ctx.guild.get_role(await getRoleID(gamerole)))
                 await player.move_to(cast(VoiceChannel, GVoiceChannel))
@@ -380,7 +303,8 @@ class Game(Cog):
     @commands.hybrid_command(name="choose", description="Befehl, um die Rolle oder Fraktion zu wählen, die man bei dem Modus Rollenwahl bekommen will.")
     @check(lambda x: Game._choices_active)
     async def setChoices(self, ctx: Context):
-        selection = RoleSelection()
+        cadre = await getCadre()
+        selection = RoleSelection(list(cadre.keys()))
         await ctx.send("Wähle eine Rolle aus", view=selection, delete_after=60.0, ephemeral=True)
         try:
             await self.bot.wait_for("interaction", timeout=60.0)
@@ -405,7 +329,7 @@ class Game(Cog):
             raise exc
 
     @commands.hybrid_command(name="dead", aliases=["tot"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def setDead(self, ctx: Context, player: Optional[Member]):
         """
         Der gegebene Spieler wird 'getötet'.
@@ -421,7 +345,7 @@ class Game(Cog):
             )
             player = livingPlayers[playerNum]
         for role in player.roles:
-            if self.checkRolePos(role, ctx.guild) and role.id != 768494431136645127:
+            if await self.checkRolePos(role, ctx.guild) and role.id != 768494431136645127:
                 await player.remove_roles(role)
                 await player.edit(mute=True)
         await player.add_roles(ctx.guild.get_role(await getRoleID("dead")))
@@ -443,7 +367,7 @@ class Game(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     @commands.hybrid_command(name="captain", aliases=["hauptmann", "cp"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def setCaptain(self, ctx: Context, player: Optional[Member]):
         """
         Der gegebene Spieler wird die Rolle 'Hauptmann' gegeben.
@@ -471,13 +395,13 @@ class Game(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     @commands.hybrid_command(name="chronicle", aliases=["chronik", "writeChronicle", "wrCr"])
-    @has_role(await getRoleID("gamemaster"))
-    async def writeChronicle(self, ctx: Context, maxPlayers: Optional[int] = 20):
+    @is_gamemaster()
+    async def writeChronicle(self, ctx: Context, max_players: Optional[int] = 20):
         """
         Die Chronik für dieses Spiel wird in den zugehörigen Kanal geschrieben.
         Es kann nur von dem letzten Spiel die Chronik geschrieben werden.
         Die Chronik kann nur richtig geschrieben werden, wenn der Bot durch die Befehle 'tot', 'hauptmann' und 'start' alle Informationen richtig bekommen hat.
-        ``maxPlayers``: Die maximale Spielerzahl (optional) (default = 20)
+        ``max_players``: Die maximale Spielerzahl (optional) (default = 20)
         """
         gameCadre = await getCurrentGameCadre()
         if gameCadre == {}:
@@ -538,7 +462,7 @@ class Game(Cog):
         msg = CHRONICLE_PATTERN.format(
             datum=format_date(date.today(), "EEEE, dd.MM.yyyy", locale="de_DE"),
             numRound=self.bot._roundNum,
-            maxPlayer=maxPlayers,
+            maxPlayer=max_players,
             numPlayer=len(gameCadre),
             gamemaster=self.bot._current_gamemaster.mention,
             playerDict="\n".join(map(lambda x: f"{x[0].removeprefix('♰')}: {x[1]}", resultCadre.items())),
@@ -559,24 +483,19 @@ class Game(Cog):
         self.bot._lastRound = date.today()
         self.bot._ghostvoices = False
         await ctx.invoke(self.removeLovebirds)
+        gm_role_id = await getRoleID("gamemaster")
         for player in gameCadre:
             nick: str = player.display_name
             await player.edit(nick=nick.removeprefix("♰"))
-            await player.remove_roles(
-                cast(Snowflake, list(map(
-                    lambda x: cast(Role, x).id,
-                    filter(
-                        lambda x: x.id != await getRoleID("gamemaster"),
-                        player.roles
-                    )
-                ))[0])
-            )
+            for role in player.roles:
+                if await self.checkRolePos(role, ctx.guild) and role.id != gm_role_id:
+                    await player.remove_roles(role)
             if player.voice is not None:
                 await player.edit(mute=False)
         await setCurrentGameCadre({})
 
     @commands.hybrid_command(name="love", aliases=["liebe", "liebende"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def setLovebirds(self, ctx: Context, player1: Member, player2: Member):
         """
         Die beiden gegebenen Spieler werden das Liebespaar.
@@ -607,7 +526,7 @@ class Game(Cog):
         )
 
     @commands.hybrid_command(name="remove_love", aliases=["minusLove", "entferneLiebe", "rmLv"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def removeLovebirds(self, ctx: Context):
         """
         Das Liebespaar wird aufgelöst.
@@ -633,7 +552,7 @@ class Game(Cog):
         )
 
     @commands.hybrid_command(name="ghostvoices", aliases=["geisterstimmen", "gv", "gs"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def setGhostvoices(self, ctx: Context):
         """
         Schaltet die Geiterstimmen frei.
@@ -646,40 +565,43 @@ class Game(Cog):
         )
 
     @commands.hybrid_command(name="reset", aliases=["resette", "restart"])
-    @has_role(await getRoleID("gamemaster"))
-    async def resetRole(self, ctx: Context, player: Union[Member, str]):
+    @is_gamemaster()
+    async def resetRole(self, ctx: Context, player: Optional[Member] = None, reset_all: bool = False):
         """
         Setzt den Spieler zum Stand am Anfang der Runde zurück.
-        Wenn ein "all" hinzugefügt wird, dann wird die ganze Runde (alle Spieler) auf den Start der Runde zurückgesetzt.
-        ``player``: Der Spieler, dessen Rolle zurückgesetzt werden soll, oder alle
-        Möglichkeiten für ``player``: <ein Spieler>, 'all', 'alle', 'jeden'
+        ``player``: Der Spieler, dessen Rolle zurückgesetzt werden soll
+        ``reset_all``: True, um das gesamte Spiel zurückzusetzen
         """
-        if type(player) == str:
-            if player.lower not in ("all", "alle", "jeden"):
-                await ctx.send("""\tGibt bitte einen Spieler ein um diesen zurückzusetzen.
-\tOder gibt eine der folgenden Möglichkeiten ein um das Spiel erneut zu starten: 'all', 'alle', 'jeden'""",
-                               delete_after=20.0)
+        if not player and not reset_all:
+            await ctx.send("Gibt bitte einen Spieler ein um diesen zurückzusetzen oder wähle reset_all=True.", delete_after=20.0)
+            return
+            
         cadre = await getCurrentGameCadre()
         res_cadre = cadre.copy()
-        if type(player) == str:
+        
+        if reset_all:
             title = "Das Spiel wurde zurückgesetzt"
             for ply, attrs in cadre.items():
                 for attr, value in attrs.items():
                     if type(value) == bool:
                         res_cadre[ply][attr] = False
                 for role in ply.roles:
-                    if self.checkRolePos(role, ctx.guild):
-                        await player.remove_roles(role)
-                await player.add_roles(ctx.guild.get_role(await getRoleID(attrs["role"])))
+                    if await self.checkRolePos(role, ctx.guild):
+                        await ply.remove_roles(role)
+                await ply.add_roles(ctx.guild.get_role(await getRoleID(attrs["role"])))
         else:
+            if player not in cadre:
+                await ctx.send("Dieser Spieler ist nicht im aktuellen Spielkader.", delete_after=20.0)
+                return
             title = "Der Spieler wurde zurückgesetzt"
             for attr, value in cadre[player].items():
                 if type(value) == bool:
                     res_cadre[player][attr] = False
             for role in player.roles:
-                if self.checkRolePos(role, ctx.guild):
+                if await self.checkRolePos(role, ctx.guild):
                     await player.remove_roles(role)
                 await player.add_roles(ctx.guild.get_role(await getRoleID(cadre[player]["role"])))
+                
         await setCurrentGameCadre(res_cadre)
         embed = Embed(title=title,
                       description="Das Spiel sieht jetzt wie folgt aus:",
@@ -708,21 +630,25 @@ async def setup(bot: My_Bot):
 
 
 class RoleSelection(View):
-
-    def __init__(self, *items: Item, timeout: Optional[float] = 180.0):
+    def __init__(self, cadre_keys: list[str], *items: Item, timeout: Optional[float] = 180.0):
         super().__init__(*items, timeout=timeout)
         self.interaction: Interaction = None
         self.selected: str = None
+        
+        options = [SelectOption(label=x[0], description=x[1]) for x in
+                 [(i.title(), "Rolle") for i in cadre_keys] + [("Dorf", "Fraktion"), ("Werwölfe", "Fraktion"), ("Drittpartei", "Fraktion")]] + \
+                [SelectOption(label="Keine Auswahl", description="Abbrechen der Auswahl, indem nichts gewählt wird", value="None", default=True)]
+                
+        self.select_menu = discord.ui.Select(
+            placeholder="Choose a role or fraction you want to play",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+        self.select_menu.callback = self.select_callable
+        self.add_item(self.select_menu)
 
-    @discord.ui.select(
-        placeholder="Choose a role or fraction you want to play",
-        min_values=1,
-        max_values=1,
-        options=[SelectOption(label=x[0], description=x[1]) for x in
-                 [(i.title(), "Rolle") for i in await getCadre().keys()] + [("Dorf", "Fraktion"), ("Werwölfe", "Fraktion"), ("Drittpartei", "Fraktion")]] +
-                [SelectOption(label="Keine Auswahl", description="Abbrechen der Auswahl, indem nichts gewählt wird", value="None", default=True)],
-    )
-    async def select_callable(self, select: Select, interaction: Interaction):
+    async def select_callable(self, interaction: Interaction):
         self.stop()
-        self.selected = select.values[0]
+        self.selected = self.select_menu.values[0]
         self.interaction = interaction

@@ -3,6 +3,7 @@ from typing import Optional
 
 from discord import Colour, Embed, Guild, Emoji, Member
 from discord.channel import TextChannel
+from discord.ext import commands
 from discord.ext.commands import Cog, Context, hybrid_command, has_role
 from discord.utils import get
 from num2words import num2words  # type: ignore
@@ -10,14 +11,10 @@ from word2number import w2n
 
 from lib.bot import My_Bot
 from lib.db.db import getChannelID, getRoleID
-from lib.helper.constants import (
-    BOTPATH,
-    EMOJIS,
-    MyRoleConverter,
-    getCadre,
-    setDefaultCadre,
-    setPlayingCadre,
-)
+from lib.helper.checks import is_gamemaster
+from lib.helper.constants import BOTPATH, EMOJIS
+from lib.db.cadre_db import getCadre, setDefaultCadre, setPlayingCadre
+from lib.helper.converters import MyRoleConverter
 
 
 async def updateEmojis(guild: Guild, emojis: list[int]):
@@ -77,10 +74,9 @@ class Settings(Cog):
         self.bot = bot
         self.bot.emitter.on("delEmojis", self.delEmojis)
 
-    @property
-    def cadreLength(self):
+    async def cadreLength(self):
         game = self.bot.get_cog("Game")
-        return game.cadreLength  # type:ignore
+        return await game.cadreLength()
 
     @staticmethod
     async def getNewCadre(ctx: Context):
@@ -122,7 +118,7 @@ class Settings(Cog):
         return squadDict
 
     @commands.hybrid_command(name="standardkader", aliases=["dafaultcadre", "defcadre"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def setDefaultCadre(self, ctx: Context):
         """
         Hiermit kannst du den Standard-Kader des Bots festlegen.
@@ -140,11 +136,11 @@ class Settings(Cog):
         for role, num in squadDict.items():
             value += f"{str(role).title()}: {num}\n"
 
-        embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
+        embed.add_field(name=f"{await self.cadreLength()}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
 
     @commands.hybrid_command(name="change", aliases=["ändern", "wechseln"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def changeCadre(self, ctx: Context, clear: Optional[str] = None):
         """
         Hiermit änderst du den aktuellen Spielekader.
@@ -173,12 +169,12 @@ class Settings(Cog):
         for role, num in squadDict.items():
             value += f"{str(role).title()}: {num}\n"
 
-        embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
+        embed.add_field(name=f"{await self.cadreLength()}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
 
     # last stand with lukas
     @commands.hybrid_command(name="fill", aliases=["hinzufügen", "add"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def addCitizen(self, ctx: Context):
         """
         Zu dem aktuellen Spielekader wird ein Dorfbewohner hinzugefügt.
@@ -194,7 +190,7 @@ class Settings(Cog):
         await self.returnCadre(ctx)
 
     @commands.hybrid_command(name="minus", aliases=["entfernen", "sub"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def removeCitizen(self, ctx: Context):
         """
         Von dem aktuellen Kader wird ein Dorfbewohner entfernt.
@@ -231,11 +227,11 @@ class Settings(Cog):
         for role, num in cadre.items():
             value += f"{str(role).title()}: {num}\n"
 
-        embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
+        embed.add_field(name=f"{await self.cadreLength()}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
 
     @commands.hybrid_command(name="set_role", aliases=["gibRolle", "role"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def setPlayerRole(self, ctx: Context, player: Member, role: MyRoleConverter):
         await player.add_roles(role)
         await ctx.send(
@@ -250,7 +246,7 @@ class Settings(Cog):
         )
 
     @commands.hybrid_command(name="delete", aliases=["lösche", "del"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def deleteMessages(self, ctx: Context, number: Optional[int] = 1, channel: Optional[TextChannel] = None):
         """
         Löscht die angegebene Anzahl an Nachrichten im angegebenen Kanal.
@@ -272,7 +268,7 @@ class Settings(Cog):
         )
 
     @commands.hybrid_command(name="clear", aliases=["aufräumen", "leeren"])
-    @has_role(await getRoleID("gamemaster"))
+    @is_gamemaster()
     async def clearGameChannels(self, ctx: Context):
         """
         Die Kanäle, in denen gespielt wird, werden aufgeräumt.

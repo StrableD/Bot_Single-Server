@@ -1,5 +1,6 @@
 import os
 import asyncio
+import yt_dlp
 from discord import FFmpegPCMAudio
 import discord
 from discord import app_commands

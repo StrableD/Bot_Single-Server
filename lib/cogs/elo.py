@@ -5,7 +5,7 @@ from random import choice
 from numpy import average, e
 from lib.helper.constants import BONI
 from lib.helper.errors import NoPerms
-from lib.cogs.help import is_guild_owner
+from lib.helper.errors import NoPerms
 from lib.db.db import (
     getElo,
     getGameToEvaluate,

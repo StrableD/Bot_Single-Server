@@ -1,10 +1,9 @@
 import os
 import asyncio
 from discord import FFmpegPCMAudio
-from discord.ext import commands
+import discord
+from discord import app_commands
 from discord.ext.commands import Cog
-from discord.ext.commands.context import Context
-import yt_dlp
 
 from lib.bot import My_Bot
 from lib.helper.constants import BOTPATH
@@ -17,6 +16,9 @@ class Music(Cog):
     """
     Das Modul, welches die Musikunterstützung zu dem Bot hinzufügt.
     """
+
+    music_group = app_commands.Group(name="music", description="Music")
+    playlist_group = app_commands.Group(name="playlist", description="Playlist", parent=music_group)
 
     def __init__(self, bot: My_Bot):
         self.bot = bot
@@ -47,72 +49,84 @@ class Music(Cog):
                     return False
         return await loop.run_in_executor(None, download)
 
-    def play_next(self, ctx):
+    def play_next(self, guild: discord.Guild):
         if len(self.music_queue) > 0:
             self.is_playing = True
             m_url = self.music_queue.pop(0)["source"]
-            self.voice(ctx).play(FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next(ctx))
+            if guild.voice_client:
+                guild.voice_client.play(FFmpegPCMAudio(m_url, **self.FFMPEG_OPTIONS), after=lambda e: self.play_next(guild))
         else:
             self.is_playing = False
 
-    def voice(self, ctx):
-        return ctx.message.guild.voice_client
+    async def _join(self, user: discord.Member, guild: discord.Guild) -> bool:
+        if user.voice is None:
+            return False
+        voiceChannel = user.voice.channel
+        if guild.voice_client is None:
+            await voiceChannel.connect()
+        elif not guild.voice_client.is_connected() and guild.voice_client.channel != voiceChannel:
+            await voiceChannel.connect()
+        return True
 
-    @commands.hybrid_command(name="play", hidden=True)
-    async def play_track(self, ctx: Context, *, search: str):
-        """Spielt Musik von YouTube ab."""
-        await ctx.send("Suche und lade herunter...", ephemeral=True)
+    @music_group.command(name="play", description="Spielt Musik von YouTube ab.")
+    async def play_track(self, interaction: discord.Interaction, search: str):
+        await interaction.response.defer(ephemeral=True)
         song = await self.search_and_download(search)
         if type(song) == type(True):
-            await ctx.send("Konnte das Lied nicht finden oder herunterladen.", ephemeral=True)
+            await interaction.followup.send("Konnte das Lied nicht finden oder herunterladen.", ephemeral=True)
         else:
-            await ctx.send(f"Zur Warteschlange hinzugefügt: {song['title']}")
             self.music_queue.append(song)
             
             if not self.is_playing:
-                await ctx.invoke(self.join_channel)
-                self.play_next(ctx)
+                joined = await self._join(interaction.user, interaction.guild)
+                if not joined:
+                    await interaction.followup.send("Du musst mit einem Sprachkanal verbunden sein.", ephemeral=True)
+                    return
+                self.play_next(interaction.guild)
+                await interaction.followup.send(f"Spielt jetzt: {song['title']}")
+            else:
+                await interaction.followup.send(f"Zur Warteschlange hinzugefügt: {song['title']}")
 
-    @commands.hybrid_command(name="join", hidden=True)
-    async def join_channel(self, ctx: Context):
-        if ctx.author.voice is None:
-            await ctx.send("Du musst mit einem Sprachkanal verbunden sein", delete_after=30.0)
-            raise ConnectionError("Your not connected to a voice channel")
-        voiceChannel = ctx.author.voice.channel
-        if self.voice(ctx) is None:
-            await voiceChannel.connect()
-        elif not self.voice(ctx).is_connected() and self.voice(ctx).channel != voiceChannel:
-            await voiceChannel.connect()
-
-    @commands.hybrid_command(name="leave", hidden=True)
-    async def leave_channel(self, ctx: Context):
-        if self.voice(ctx) and self.voice(ctx).is_connected():
-            await self.voice(ctx).disconnect()
+    @music_group.command(name="join", description="Tritt dem Sprachkanal bei.")
+    async def join_channel(self, interaction: discord.Interaction):
+        joined = await self._join(interaction.user, interaction.guild)
+        if not joined:
+            await interaction.response.send_message("Du musst mit einem Sprachkanal verbunden sein.", ephemeral=True)
         else:
-            await ctx.send("Der Bot ist in keinem Sprachkanal.", delete_after=30.0)
+            await interaction.response.send_message("Sprachkanal beigetreten.", ephemeral=True)
 
-    @commands.hybrid_command(name="pause", hidden=True)
-    async def pause_track(self, ctx: Context):
-        if self.voice(ctx) and self.voice(ctx).is_playing():
-            self.voice(ctx).pause()
-            await ctx.send("Musik pausiert.")
+    @music_group.command(name="leave", description="Verlässt den Sprachkanal.")
+    async def leave_channel(self, interaction: discord.Interaction):
+        if interaction.guild.voice_client and interaction.guild.voice_client.is_connected():
+            await interaction.guild.voice_client.disconnect()
+            await interaction.response.send_message("Sprachkanal verlassen.", ephemeral=True)
         else:
-            await ctx.send("Zurzeit wird keine Musik abgespielt.", delete_after=30.0)
+            await interaction.response.send_message("Der Bot ist in keinem Sprachkanal.", ephemeral=True)
 
-    @commands.hybrid_command(name="resume", hidden=True)
-    async def resume_track(self, ctx: Context):
-        if self.voice(ctx) and self.voice(ctx).is_paused():
-            self.voice(ctx).resume()
-            await ctx.send("Musik fortgesetzt.")
+    @music_group.command(name="pause", description="Pausiert die aktuelle Musik.")
+    async def pause_track(self, interaction: discord.Interaction):
+        if interaction.guild.voice_client and interaction.guild.voice_client.is_playing():
+            interaction.guild.voice_client.pause()
+            await interaction.response.send_message("Musik pausiert.", ephemeral=True)
         else:
-            await ctx.send("Es wird noch Musik gespielt", delete_after=30.0)
+            await interaction.response.send_message("Zurzeit wird keine Musik abgespielt.", ephemeral=True)
 
-    @commands.hybrid_command(name="stop", hidden=True)
-    async def stop_track(self, ctx: Context):
-        if self.voice(ctx):
-            self.voice(ctx).stop()
+    @music_group.command(name="resume", description="Setzt die aktuelle Musik fort.")
+    async def resume_track(self, interaction: discord.Interaction):
+        if interaction.guild.voice_client and interaction.guild.voice_client.is_paused():
+            interaction.guild.voice_client.resume()
+            await interaction.response.send_message("Musik fortgesetzt.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Es wird noch Musik gespielt oder es gibt nichts fortzusetzen.", ephemeral=True)
+
+    @music_group.command(name="stop", description="Stoppt die Musik und leert die Warteschlange.")
+    async def stop_track(self, interaction: discord.Interaction):
+        if interaction.guild.voice_client:
+            interaction.guild.voice_client.stop()
             self.music_queue = []
-            await ctx.send("Musik gestoppt und Warteschlange geleert.")
+            await interaction.response.send_message("Musik gestoppt und Warteschlange geleert.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Zurzeit wird keine Musik abgespielt.", ephemeral=True)
 
     @Cog.listener()
     async def on_ready(self):

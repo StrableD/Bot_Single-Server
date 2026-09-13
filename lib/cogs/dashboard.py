@@ -30,17 +30,43 @@ class GamemasterDashboard(View):
 
     @discord.ui.button(label="View Roles", style=discord.ButtonStyle.secondary, custom_id="gm_dash_roles")
     async def view_roles_btn(self, interaction: discord.Interaction, button: Button):
-        cadre = await getCurrentGameCadre(interaction.guild)
+        cadre = await getCurrentGameCadre()
         if not cadre:
             await interaction.response.send_message("No active game cadre.", ephemeral=True)
             return
         
-        desc = "\\n".join([f"{member.display_name}: {info['role']} (Dead: {info['dead']})" for member, info in cadre.items()])
+        desc = "\n".join([f"{member}: {info['role']} (Dead: {info['dead']})" for member, info in cadre.items()])
         embed = discord.Embed(title="Current Cadre", description=desc, color=discord.Color.blurple())
         await interaction.response.send_message(embed=embed, ephemeral=True)
+        
+    @discord.ui.button(label="Pending Actions", style=discord.ButtonStyle.danger, custom_id="gm_dash_actions")
+    async def pending_actions_btn(self, interaction: discord.Interaction, button: Button):
+        from lib.db.db import AsyncSessionLocal
+        from lib.db.models import ActionRequest, Lobby
+        from sqlalchemy import select
+        
+        async with AsyncSessionLocal() as session:
+            lobby = await session.execute(select(Lobby).where(Lobby.is_active == True))
+            active_lobby = lobby.scalar_one_or_none()
+            if not active_lobby:
+                await interaction.response.send_message("No active lobby.", ephemeral=True)
+                return
+            
+            reqs = await session.execute(select(ActionRequest).where(ActionRequest.lobby_id == active_lobby.id, ActionRequest.status == "pending"))
+            actions = reqs.scalars().all()
+            
+            if not actions:
+                await interaction.response.send_message("No pending actions.", ephemeral=True)
+                return
+            
+            desc = "\n".join([f"ID {a.id}: <@{a.player_id}> wants to '{a.action_type}' on <@{a.target_id}>" for a in actions])
+            embed = discord.Embed(title="Pending Actions", description=desc, color=discord.Color.orange())
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            
+            # To-Do: Add approve/reject buttons attached to this message
 
     async def generate_embed(self, guild):
-        cadre = await getCurrentGameCadre(guild)
+        cadre = await getCurrentGameCadre()
         alive_count = sum(1 for info in cadre.values() if not info["dead"]) if cadre else 0
         dead_count = sum(1 for info in cadre.values() if info["dead"]) if cadre else 0
         

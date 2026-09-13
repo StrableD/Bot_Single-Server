@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from discord.ext.commands import Context
+from discord import app_commands
 from lib.db.db import AsyncSessionLocal
 from lib.db.models import Player, League
 from sqlalchemy import select
@@ -9,17 +9,20 @@ class PlayerProfilesCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="profile")
-    async def profile(self, ctx: Context, member: discord.Member = None):
-        """Displays a rich player profile with Match History and Rank."""
-        target = member or ctx.author
+    player_group = app_commands.Group(name="player", description="Player commands")
+
+    @player_group.command(name="profile", description="Displays a rich player profile with Match History and Rank.")
+    async def profile(self, interaction: discord.Interaction, member: discord.Member = None):
+        target = member or interaction.user
         
+        await interaction.response.defer(ephemeral=True)
+
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(Player).where(Player.PlayerId == target.id))
             player_data = result.scalar_one_or_none()
             
             if not player_data:
-                await ctx.send(f"{target.display_name} has no recorded games or Elo.", ephemeral=True)
+                await interaction.followup.send(f"{target.display_name} has no recorded games or Elo.", ephemeral=True)
                 return
 
             result = await session.execute(select(League))
@@ -46,39 +49,40 @@ class PlayerProfilesCog(commands.Cog):
             view = discord.ui.View()
             btn = discord.ui.Button(label="Share to Channel", style=discord.ButtonStyle.success)
             
-            async def share_callback(interaction):
-                await interaction.channel.send(embed=embed)
-                await interaction.response.send_message("Profile shared!", ephemeral=True)
+            async def share_callback(btn_interaction: discord.Interaction):
+                await btn_interaction.channel.send(embed=embed)
+                await btn_interaction.response.send_message("Profile shared!", ephemeral=True)
                 
             btn.callback = share_callback
             view.add_item(btn)
             
-            await ctx.send(embed=embed, view=view, ephemeral=True)
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
-    @commands.hybrid_command(name="leaderboard")
-    async def leaderboard(self, ctx: Context, public: bool = False):
-        """Displays the server's top players by Elo ranking."""
+    @player_group.command(name="leaderboard", description="Displays the server's top players by Elo ranking.")
+    async def leaderboard(self, interaction: discord.Interaction, public: bool = False):
         # If user is not GM, ignore public flag and force ephemeral
-        gm_role = discord.utils.get(ctx.guild.roles, name="gamemaster") # rough check
-        if gm_role not in ctx.author.roles:
+        gm_role = discord.utils.get(interaction.guild.roles, name="gamemaster") # rough check
+        if gm_role not in interaction.user.roles:
             public = False
+            
+        await interaction.response.defer(ephemeral=not public)
             
         async with AsyncSessionLocal() as session:
             result = await session.execute(select(Player).order_by(Player.Elo.desc()).limit(10))
             players = result.scalars().all()
             
             if not players:
-                await ctx.send("No players ranked yet.", ephemeral=True)
+                await interaction.followup.send("No players ranked yet.", ephemeral=not public)
                 return
                 
             embed = discord.Embed(title="Server Leaderboard - Top 10", color=discord.Color.blue())
             
             desc = ""
             for i, p in enumerate(players, 1):
-                desc += f"**{i}.** {p.PlayerName} - {p.Elo} Elo\\n"
+                desc += f"**{i}.** {p.PlayerName} - {p.Elo} Elo\n"
             
             embed.description = desc
-            await ctx.send(embed=embed, ephemeral=not public)
+            await interaction.followup.send(embed=embed, ephemeral=not public)
 
 async def setup(bot):
     await bot.add_cog(PlayerProfilesCog(bot))

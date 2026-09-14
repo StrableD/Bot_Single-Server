@@ -129,10 +129,7 @@ class Music(Cog):
         else:
             await interaction.response.send_message("Zurzeit wird keine Musik abgespielt.", ephemeral=True)
 
-    @Cog.listener()
-    async def on_ready(self):
-        if not self.bot.ready:
-            self.bot.cogs_ready.ready_up("music")
+
 
 async def setup(bot: My_Bot):
     await bot.add_cog(Music(bot))

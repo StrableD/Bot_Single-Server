@@ -2,7 +2,7 @@ import logging
 import logging.config
 import json
 import os
-from asyncio.tasks import sleep
+
 from datetime import date
 from os.path import getmtime
 
@@ -14,7 +14,7 @@ from discord.ext.commands import Bot
 
 from discord.mentions import AllowedMentions
 from discord.message import Message
-from pyee.asyncio import AsyncIOEventEmitter
+
 
 from lib.db.db import getChannelID, updateMembers, AsyncSessionLocal, build
 
@@ -48,36 +48,21 @@ LOGGING = {
 }
 logging.config.dictConfig(LOGGING)
 
-class Ready(object):
-    def __init__(self):
-        for cog in COGS:
-            setattr(self, cog, False)
 
-    def ready_up(self, cog):
-        setattr(self, cog, True)
-        bot.logger.info(f" {cog} cog ready")
-
-    def all_ready(self):
-        return all([getattr(self, cog) for cog in COGS])
 
 class My_Bot(Bot):
     def __init__(self):
         guild_ids = [int(g) for g in os.getenv("GUILD_IDS", "").split(",") if g]
+        owner_id = int(os.getenv("OWNER_ID", 0)) if os.getenv("OWNER_ID") else None
         super().__init__(
-            command_prefix=">",
-            owner_id=312644293602836482,
+            command_prefix="!",
+            owner_id=owner_id,
             intents=Intents.all(),
-            debug_guilds=guild_ids if guild_ids else None,
-            case_insensitive=True
+            debug_guilds=guild_ids if guild_ids else None
         )
 
         self.ready = False
-        self.cogs_ready = Ready()
-
-
         self.guild: Guild = None
-
-        self.emitter = AsyncIOEventEmitter()
         self.logger = logging.getLogger("My_Bot")
 
 
@@ -118,9 +103,6 @@ class My_Bot(Bot):
 
             if self.guild:
                 await updateMembers(list(filter(lambda x: not x.bot, self.guild.members)))
-
-            while not self.cogs_ready.all_ready():
-                await sleep(0.5)
 
             self.ready = True
             self.logger.info("bot is ready")

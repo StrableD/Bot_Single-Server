@@ -92,6 +92,7 @@ async def test_start_match_assigns_roles(mock_bot, mock_interaction, setup_test_
         assert roles.count("werwolf") == 1
         assert roles.count("dorfbewohner") == 2
 
-        # Lobby should be inactive
+        # Lobby should be marked as playing
         updated_lobby = await session.get(Lobby, lobby_id)
-        assert not updated_lobby.is_active
+        assert updated_lobby.status == "playing"
+        assert updated_lobby.is_active

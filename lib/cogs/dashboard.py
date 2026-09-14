@@ -2,10 +2,58 @@ import discord
 from discord.ext import commands
 from discord.ext.commands import Cog, Context
 from discord.ui import Button, View
+from sqlalchemy import select
 
 from lib.bot import My_Bot
-from lib.db.cadre_db import getCurrentGameCadre
+from lib.db.db import AsyncSessionLocal
+from lib.db.models import ActionRequest, Lobby, LobbyPlayer
 from lib.helper.checks import is_gamemaster
+
+
+class ActionApprovalView(discord.ui.View):
+    def __init__(self, action_id: int):
+        super().__init__(timeout=None)
+        self.action_id = action_id
+
+    @discord.ui.button(label="Approve", style=discord.ButtonStyle.success)
+    async def approve_btn(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        async with AsyncSessionLocal() as session:
+            req = await session.get(ActionRequest, self.action_id)
+            if not req or req.status != "pending":
+                await interaction.response.send_message(
+                    "Action already processed or not found.", ephemeral=True
+                )
+                return
+            req.status = "approved"
+            await session.commit()
+
+            for child in self.children:
+                child.disabled = True
+            await interaction.response.edit_message(
+                content=f"✅ Action {self.action_id} approved.", embed=None, view=self
+            )
+
+    @discord.ui.button(label="Reject", style=discord.ButtonStyle.danger)
+    async def reject_btn(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        async with AsyncSessionLocal() as session:
+            req = await session.get(ActionRequest, self.action_id)
+            if not req or req.status != "pending":
+                await interaction.response.send_message(
+                    "Action already processed or not found.", ephemeral=True
+                )
+                return
+            req.status = "rejected"
+            await session.commit()
+
+            for child in self.children:
+                child.disabled = True
+            await interaction.response.edit_message(
+                content=f"❌ Action {self.action_id} rejected.", embed=None, view=self
+            )
 
 
 class GamemasterDashboard(View):
@@ -54,23 +102,33 @@ class GamemasterDashboard(View):
         custom_id="gm_dash_roles",
     )
     async def view_roles_btn(self, interaction: discord.Interaction, button: Button):
-        cadre = await getCurrentGameCadre()
-        if not cadre:
-            await interaction.response.send_message(
-                "No active game cadre.", ephemeral=True
-            )
-            return
+        async with AsyncSessionLocal() as session:
+            lobby = await session.execute(select(Lobby).where(Lobby.is_active))
+            active_lobby = lobby.scalar_one_or_none()
+            if not active_lobby:
+                await interaction.response.send_message(
+                    "No active game.", ephemeral=True
+                )
+                return
 
-        desc = "\n".join(
-            [
-                f"{member}: {info['role']} (Dead: {info['dead']})"
-                for member, info in cadre.items()
-            ]
-        )
-        embed = discord.Embed(
-            title="Current Cadre", description=desc, color=discord.Color.blurple()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+            players_res = await session.execute(
+                select(LobbyPlayer).where(LobbyPlayer.lobby_id == active_lobby.id)
+            )
+            players = players_res.scalars().all()
+
+            if not players:
+                await interaction.response.send_message(
+                    "No players in game.", ephemeral=True
+                )
+                return
+
+            desc = "\n".join(
+                [f"<@{p.player_id}>: {p.role} (Dead: {p.is_dead})" for p in players]
+            )
+            embed = discord.Embed(
+                title="Current Cadre", description=desc, color=discord.Color.blurple()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @discord.ui.button(
         label="Pending Actions",
@@ -80,11 +138,6 @@ class GamemasterDashboard(View):
     async def pending_actions_btn(
         self, interaction: discord.Interaction, button: Button
     ):
-        from sqlalchemy import select
-
-        from lib.db.db import AsyncSessionLocal
-        from lib.db.models import ActionRequest, Lobby
-
         async with AsyncSessionLocal() as session:
             lobby = await session.execute(select(Lobby).where(Lobby.is_active))
             active_lobby = lobby.scalar_one_or_none()
@@ -108,25 +161,38 @@ class GamemasterDashboard(View):
                 )
                 return
 
-            desc = "\n".join(
-                [
-                    f"ID {a.id}: <@{a.player_id}> wants to '{a.action_type}' on <@{a.target_id}>"
-                    for a in actions
-                ]
+            await interaction.response.send_message(
+                f"Found {len(actions)} pending actions.", ephemeral=True
             )
-            embed = discord.Embed(
-                title="Pending Actions", description=desc, color=discord.Color.orange()
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-
-            # To-Do: Add approve/reject buttons attached to this message
+            for a in actions:
+                embed = discord.Embed(
+                    title=f"Action Request #{a.id}",
+                    description=f"<@{a.player_id}> wants to **{a.action_type}** on <@{a.target_id}>",
+                    color=discord.Color.orange(),
+                )
+                view = ActionApprovalView(action_id=a.id)
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     async def generate_embed(self, guild):
-        cadre = await getCurrentGameCadre()
-        alive_count = (
-            sum(1 for info in cadre.values() if not info["dead"]) if cadre else 0
-        )
-        dead_count = sum(1 for info in cadre.values() if info["dead"]) if cadre else 0
+        async with AsyncSessionLocal() as session:
+            lobby_res = await session.execute(select(Lobby).where(Lobby.is_active))
+            active_lobby = lobby_res.scalar_one_or_none()
+
+            if not active_lobby:
+                embed = discord.Embed(
+                    title="Gamemaster Dashboard",
+                    description="No active game.",
+                    color=discord.Color.dark_theme(),
+                )
+                return embed
+
+            players_res = await session.execute(
+                select(LobbyPlayer).where(LobbyPlayer.lobby_id == active_lobby.id)
+            )
+            players = players_res.scalars().all()
+
+            alive_count = sum(1 for p in players if not p.is_dead)
+            dead_count = sum(1 for p in players if p.is_dead)
 
         embed = discord.Embed(
             title="Gamemaster Dashboard",
@@ -135,7 +201,11 @@ class GamemasterDashboard(View):
         )
         embed.add_field(name="Players Alive", value=str(alive_count), inline=True)
         embed.add_field(name="Players Dead", value=str(dead_count), inline=True)
-        embed.add_field(name="Phase", value="Night/Day Phase X", inline=True)
+        embed.add_field(
+            name="Phase",
+            value=active_lobby.phase.title() if active_lobby.phase else "None",
+            inline=True,
+        )
         return embed
 
 

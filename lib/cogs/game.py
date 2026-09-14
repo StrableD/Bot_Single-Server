@@ -25,7 +25,7 @@ class LobbyView(discord.ui.View):
     ):
         async with db.AsyncSessionLocal() as session:
             lobby = await session.get(Lobby, self.lobby_id)
-            if not lobby or not lobby.is_active:
+            if not lobby or not lobby.is_active or lobby.status != "setup":
                 await interaction.response.send_message(
                     "This lobby is closed.", ephemeral=True
                 )
@@ -119,7 +119,7 @@ class LobbyView(discord.ui.View):
                 )
                 return
 
-            lobby.is_active = False
+            lobby.status = "playing"
 
             # Save the current game cadre
             await setCurrentGameCadre(cadre)
@@ -189,6 +189,7 @@ class LobbyView(discord.ui.View):
                 return
 
             lobby.is_active = False
+            lobby.status = "finished"
             await session.commit()
 
             for child in self.children:
@@ -362,6 +363,7 @@ class Game(Cog):
                 return
 
             lobby.is_active = False
+            lobby.status = "finished"
 
             # Evaluate Elo
             lps_res = await session.execute(
@@ -428,12 +430,27 @@ class Game(Cog):
             app_commands.Choice(name="Voting", value="voting"),
         ]
     )
+    @app_is_gamemaster()
     async def gm_phase(
         self, interaction: discord.Interaction, phase: app_commands.Choice[str]
     ):
+        async with db.AsyncSessionLocal() as session:
+            res = await session.execute(
+                select(Lobby).where(Lobby.is_active, Lobby.status == "playing")
+            )
+            lobby = res.scalar_one_or_none()
+            if not lobby:
+                await interaction.response.send_message(
+                    "No active game is currently playing.", ephemeral=True
+                )
+                return
+
+            lobby.phase = phase.value
+            await session.commit()
+
         await interaction.response.send_message(
-            f"Transitioning to {phase.name} phase... Prompting players for actions.",
-            ephemeral=True,
+            f"Transitioning to {phase.name} phase...",
+            ephemeral=False,
         )
 
 

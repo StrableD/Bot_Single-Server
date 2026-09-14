@@ -53,6 +53,8 @@ class Lobby(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     gamemaster_id = Column(Integer)
     cadre_type = Column(String)  # Selected standard cadre, e.g. '10er'
+    status = Column(String, default="setup")  # setup, playing, finished
+    phase = Column(String, default="none")  # e.g., night, day, voting
     is_active = Column(Boolean, default=True)
 
 

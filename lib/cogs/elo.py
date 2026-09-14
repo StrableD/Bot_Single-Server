@@ -52,10 +52,7 @@ class Elo(Cog):
         else:
             await interaction.followup.send("Dieser Spieler hat noch keine Elo.", ephemeral=True)
 
-    @Cog.listener()
-    async def on_ready(self):
-        if not self.bot.ready:
-            self.bot.cogs_ready.ready_up("elo")
+
 
 async def setup(bot: My_Bot):
     await bot.add_cog(Elo(bot))

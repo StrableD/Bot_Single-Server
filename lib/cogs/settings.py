@@ -2,84 +2,56 @@ from pathlib import Path
 from typing import Optional
 
 import discord
-from discord import Colour, Embed, Guild, Emoji, Member, app_commands
+from discord import Colour, Embed, Guild, Member, app_commands
 from discord.channel import TextChannel
 from discord.ext import commands
 from discord.ext.commands import Cog
 from discord.utils import get
-from num2words import num2words  # type: ignore
-from word2number import w2n
 
 from lib.bot import My_Bot
 from lib.db.db import getChannelID, getRoleID
 from lib.helper.checks import is_gamemaster
-from lib.helper.constants import BOTPATH, EMOJIS
 from lib.db.cadre_db import getCadre, setDefaultCadre, setPlayingCadre
 
 
-async def updateEmojis(guild: Guild, emojis: list[int]):
-    returnEmojis = []
-    emojisToAdd = []
-    for image in Path(BOTPATH + "/data/emojis").glob("*.png"):
-        for emoji in emojis:
-            if image.name == f"keycap_{num2words(emoji)}.png":
-                emojisToAdd.append(image)
-                continue
-    for emoji in emojisToAdd:
-        if emoji.stem not in list(map(lambda m: m.name, guild.emojis)):
-            addedEmoji = await guild.create_custom_emoji(
-                name=emoji.stem, image=open(emoji, "rb").read()
-            )
-            returnEmojis.append(addedEmoji)
-    return returnEmojis
-
+class SurveyView(discord.ui.View):
+    def __init__(self, interaction: discord.Interaction, theme: str, content: list[tuple]):
+        super().__init__(timeout=300)
+        self.interaction = interaction
+        self.result = None
+        
+        options = []
+        for i, (name, value) in enumerate(content):
+            val_str = str(value) if str(value).isdigit() else str(i + 1)
+            options.append(discord.SelectOption(label=name[:100], description=str(value)[:100], value=val_str))
+            
+        self.select = discord.ui.Select(placeholder=theme[:100], options=options[:25])
+        
+        async def select_callback(i: discord.Interaction):
+            self.result = int(self.select.values[0])
+            await i.response.defer()
+            self.stop()
+            
+        self.select.callback = select_callback
+        self.add_item(self.select)
 
 async def takeSurvey(interaction: discord.Interaction, theme: str, content: list[tuple]):
-    embed = Embed(
-        title="Bitte auswählen", description=theme, color=Colour.from_rgb(12, 190, 220)
-    )
-    emojiNums = []
-    for name, value in content:
-        if value.isdigit():
-            emojiNums.append(int(value))
-        else:
-            emojiNums.append(content.index((name, value)) + 1)
-        embed.add_field(name=name, value=value, inline=True)
-    updatedEmojis = await updateEmojis(interaction.guild, emojiNums)
+    view = SurveyView(interaction, theme, content)
     
-    # We must send a message that can take reactions
     if interaction.response.is_done():
-        msg = await interaction.followup.send(embed=embed, wait=True)
+        msg = await interaction.followup.send(content=f"**{theme}**", view=view, wait=True, ephemeral=True)
     else:
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(content=f"**{theme}**", view=view, ephemeral=True)
         msg = await interaction.original_response()
-
-    for emoji in emojiNums:
-        if emoji <= 10:
-            await msg.add_reaction(EMOJIS[emoji])
-        else:
-            for guildEmoji in interaction.guild.emojis:
-                if guildEmoji.name == f"keycap_{num2words(emoji)}":
-                    await msg.add_reaction(guildEmoji)
-    reaction, user = await interaction.client.wait_for(
-        "reaction_add",
-        check=lambda m, u: (str(m) in EMOJIS.values() if type(m.emoji) == str else m.emoji.name in map(lambda x: f"keycap_{num2words(x)}", emojiNums)) and not u.bot,
-    )
-    await msg.delete()
-    interaction.client.emitter.emit("delEmojis", updatedEmojis)
-    if str(reaction) in EMOJIS.values():
-        for number, string in EMOJIS.items():
-            if str(reaction) == string:
-                return number
-    else:
-        reaction = str(reaction.emoji.name)[7:]
-        return w2n.word_to_num(reaction)
+        
+    await view.wait()
+    await interaction.edit_original_response(view=None)
+    return view.result
 
 
 class Settings(Cog):
     def __init__(self, bot: My_Bot):
         self.bot = bot
-        self.bot.emitter.on("delEmojis", self.delEmojis)
 
     cadre_group = app_commands.Group(name="cadre", description="Cadre management")
 
@@ -344,15 +316,9 @@ class Settings(Cog):
             
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @staticmethod
-    async def delEmojis(EmojiList: list[Emoji]):
-        for emoji in EmojiList:
-            await emoji.delete()
 
-    @Cog.listener()
-    async def on_ready(self):
-        if not self.bot.ready:
-            self.bot.cogs_ready.ready_up("settings")
+
+
 
 
 async def setup(bot):

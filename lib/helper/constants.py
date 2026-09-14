@@ -16,7 +16,7 @@ with open(f"{BOTPATH}/config/game_config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 ALL_ROLES = config.get("all_roles", [])
-EMOJIS = {int(k): v for k, v in config.get("emojis", {}).items()}
+
 TIMINGS = config.get("timings", {})
 ROLEAURA = config.get("roleaura", {})
 BONI = config.get("boni", {})

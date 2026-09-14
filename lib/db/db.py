@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy import select, update, delete
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from lib.helper.utils import member_to_json, MemberJsonDecoder
+
 from lib.db.models import Base, Channel, Role, Player, League, Game, BotState, GameCadre
 from discord import Member
 
@@ -83,20 +83,7 @@ async def updateMembers(members: list[Member]):
                 session.add(new_player)
         await session.commit()
 
-async def saveCurrentGame(gameCadre: dict, winner: str):
-    async with AsyncSessionLocal() as session:
-        eloDict = {}
-        for member in gameCadre:
-            elo = await getElo(member.id)
-            eloDict[member] = elo
 
-        jsonGameCadre = member_to_json(gameCadre)
-        jsonEloDict = member_to_json(eloDict)
-
-        game = Game(GameDict=jsonGameCadre, EloDict=jsonEloDict, winner=winner)
-        session.add(game)
-        await session.commit()
-        return game.GameNumber
 
 async def getUnevaluatedGames():
     async with AsyncSessionLocal() as session:

@@ -1,7 +1,7 @@
 import json
 from lib.db.db import AsyncSessionLocal
 from lib.db.models import GameCadre
-from lib.helper.utils import member_to_json, MemberJsonDecoder
+
 from sqlalchemy import select
 
 async def get_cadre(cadre_type: str, guild=None) -> dict:
@@ -9,20 +9,18 @@ async def get_cadre(cadre_type: str, guild=None) -> dict:
         result = await session.execute(select(GameCadre).where(GameCadre.cadre_type == cadre_type))
         cadre = result.scalar_one_or_none()
         if cadre and cadre.data:
-            decoder = MemberJsonDecoder(guild=guild)
-            return decoder.decode(json.dumps(cadre.data)) if isinstance(cadre.data, dict) else decoder.decode(cadre.data)
+            return cadre.data if isinstance(cadre.data, dict) else json.loads(cadre.data)
         return {}
 
 async def set_cadre(cadre_type: str, data: dict):
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(GameCadre).where(GameCadre.cadre_type == cadre_type))
         cadre = result.scalar_one_or_none()
-        json_data = member_to_json(data)
         
         if cadre:
-            cadre.data = json_data
+            cadre.data = data
         else:
-            new_cadre = GameCadre(cadre_type=cadre_type, data=json_data)
+            new_cadre = GameCadre(cadre_type=cadre_type, data=data)
             session.add(new_cadre)
         await session.commit()
 

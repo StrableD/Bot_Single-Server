@@ -23,8 +23,8 @@ class Role(Base):
 
 class Player(Base):
     __tablename__ = "players"
-    PlayerName = Column(String, primary_key=True)
-    PlayerId = Column(Integer)
+    PlayerId = Column(Integer, primary_key=True)
+    PlayerName = Column(String)
     PlayedGamesComplete = Column(Integer, default=0)
     WonGamesComplete = Column(Integer, default=0)
     PlayedGamesSeason = Column(Integer, default=0)
@@ -60,6 +60,8 @@ class LobbyPlayer(Base):
     __tablename__ = "lobby_players"
     lobby_id = Column(Integer, primary_key=True)
     player_id = Column(Integer, primary_key=True)
+    role = Column(String, nullable=True)
+    is_dead = Column(Boolean, default=False)
 
 
 class PhaseMusic(Base):

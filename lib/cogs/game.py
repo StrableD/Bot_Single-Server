@@ -1,13 +1,13 @@
-
 import discord
 from discord import app_commands
 from discord.ext.commands import Cog
 from sqlalchemy import select
 
 from lib.bot import My_Bot
+from lib.db import db
 from lib.db.cadre_db import getCurrentGameCadre
-from lib.db.db import AsyncSessionLocal, getRoleID
-from lib.db.models import Lobby, LobbyPlayer
+from lib.db.models import Lobby, LobbyPlayer, Player
+from lib.helper.checks import app_is_gamemaster
 
 # --- UI Views ---
 
@@ -23,7 +23,7 @@ class LobbyView(discord.ui.View):
     async def join_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
-        async with AsyncSessionLocal() as session:
+        async with db.AsyncSessionLocal() as session:
             lobby = await session.get(Lobby, self.lobby_id)
             if not lobby or not lobby.is_active:
                 await interaction.response.send_message(
@@ -74,7 +74,7 @@ class LobbyView(discord.ui.View):
     async def start_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
-        async with AsyncSessionLocal() as session:
+        async with db.AsyncSessionLocal() as session:
             lobby = await session.get(Lobby, self.lobby_id)
             if not lobby or not lobby.is_active:
                 await interaction.response.send_message(
@@ -135,7 +135,7 @@ class LobbyView(discord.ui.View):
     async def cancel_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
-        async with AsyncSessionLocal() as session:
+        async with db.AsyncSessionLocal() as session:
             lobby = await session.get(Lobby, self.lobby_id)
             if not lobby or not lobby.is_active:
                 await interaction.response.send_message(
@@ -175,7 +175,7 @@ class Game(Cog):
 
     @game_group.command(name="join", description="Join an active game lobby")
     async def game_join(self, interaction: discord.Interaction):
-        async with AsyncSessionLocal() as session:
+        async with db.AsyncSessionLocal() as session:
             result = await session.execute(select(Lobby).where(Lobby.is_active))
             lobby = result.scalar_one_or_none()
 
@@ -213,7 +213,7 @@ class Game(Cog):
     ):
         from lib.db.models import ActionRequest
 
-        async with AsyncSessionLocal() as session:
+        async with db.AsyncSessionLocal() as session:
             result = await session.execute(select(Lobby).where(Lobby.is_active))
             lobby = result.scalar_one_or_none()
             if not lobby:
@@ -257,7 +257,7 @@ class Game(Cog):
     async def gm_start(self, interaction: discord.Interaction):
         # Allow server owner or gamemaster
         try:
-            gm_id = await getRoleID("gamemaster")
+            gm_id = await db.getRoleID("gamemaster")
             is_gm = any(r.id == gm_id for r in interaction.user.roles)
         except ValueError:
             is_gm = False
@@ -268,7 +268,7 @@ class Game(Cog):
             )
             return
 
-        async with AsyncSessionLocal() as session:
+        async with db.AsyncSessionLocal() as session:
             # Check for existing lobby
             res = await session.execute(select(Lobby).where(Lobby.is_active))
             if res.scalar_one_or_none():
@@ -302,9 +302,85 @@ class Game(Cog):
     @gm_group.command(
         name="stop", description="Stop the game, calculate Elo, and chronicle"
     )
-    async def gm_stop(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            "Game stopped. Chronicle generated.", ephemeral=True
+    @app_is_gamemaster()
+    @app_commands.choices(
+        winner=[
+            app_commands.Choice(name="Dorf", value="dorf"),
+            app_commands.Choice(name="Werwölfe", value="werwolf"),
+            app_commands.Choice(name="Liebespaar", value="liebespaar"),
+            app_commands.Choice(name="Niemand", value="niemand"),
+        ]
+    )
+    async def gm_stop(
+        self, interaction: discord.Interaction, winner: app_commands.Choice[str]
+    ):
+        await interaction.response.defer(ephemeral=False)
+        async with db.AsyncSessionLocal() as session:
+            res = await session.execute(select(Lobby).where(Lobby.is_active))
+            lobby = res.scalar_one_or_none()
+            if not lobby:
+                await interaction.followup.send(
+                    "There is no active game lobby to stop.", ephemeral=True
+                )
+                return
+
+            lobby.is_active = False
+
+            # Evaluate Elo
+            lps_res = await session.execute(
+                select(LobbyPlayer).where(LobbyPlayer.lobby_id == lobby.id)
+            )
+            lobby_players = lps_res.scalars().all()
+
+            # Very basic team classification
+            werewolf_roles = {
+                "Werwolf-1",
+                "Werwolf-2",
+                "Polarwolf",
+                "Wolfsseher",
+                "Werwolfjunges",
+                "Weißer-Werwolf",
+                "Werschweinchen",
+            }
+
+            for lp in lobby_players:
+                player = await session.get(Player, lp.player_id)
+                if not player:
+                    player = Player(
+                        PlayerId=lp.player_id,
+                        PlayerName="Unknown",
+                        Elo=1300,
+                        PlayedGamesComplete=0,
+                        WonGamesComplete=0,
+                        PlayedGamesSeason=0,
+                        WonGamesSeason=0,
+                    )
+                    session.add(player)
+
+                player.PlayedGamesComplete = (player.PlayedGamesComplete or 0) + 1
+                player.PlayedGamesSeason = (player.PlayedGamesSeason or 0) + 1
+
+                # Determine win
+                is_win = False
+                if winner.value == "werwolf":
+                    is_win = lp.role in werewolf_roles
+                elif winner.value == "dorf":
+                    is_win = lp.role not in werewolf_roles and lp.role is not None
+                elif winner.value == "liebespaar":
+                    pass  # Handled differently, or we assume Amor/Lovers logic here. For now we just don't grant it to generic roles.
+
+                if is_win:
+                    player.WonGamesComplete = (player.WonGamesComplete or 0) + 1
+                    player.WonGamesSeason = (player.WonGamesSeason or 0) + 1
+                    player.Elo = (player.Elo or 1300) + 20
+                else:
+                    player.Elo = (player.Elo or 1300) - 10
+
+            await session.commit()
+
+        await interaction.followup.send(
+            f"Game stopped. Winner: {winner.name}. Elo calculated.",
+            ephemeral=False,
         )
 
     @gm_group.command(name="phase", description="Manually transition the game phase")

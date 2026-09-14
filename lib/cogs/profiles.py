@@ -42,7 +42,11 @@ class PlayerProfilesCog(commands.Cog):
 
             current_league = "Unranked"
             for league_info in leagues:
-                if (league_info.LowestElo or 0) <= player_data.Elo <= (league_info.HighestElo or 10000):
+                if (
+                    (league_info.LowestElo or 0)
+                    <= player_data.Elo
+                    <= (league_info.HighestElo or 10000)
+                ):
                     current_league = league_info.LeagueName
                     break
 

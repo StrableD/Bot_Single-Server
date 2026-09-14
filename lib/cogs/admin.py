@@ -341,6 +341,63 @@ class Admin(Cog):
         view = SetupWizard(interaction)
         await view.start()
 
+    @admin_group.command(
+        name="map_channel",
+        description="Map a bot feature to a specific Discord channel or category.",
+    )
+    @app_commands.choices(
+        bot_feature=[
+            app_commands.Choice(name="Game Category", value="game_category"),
+            app_commands.Choice(name="Default Cadre (Category)", value="default_cadre"),
+            app_commands.Choice(name="Bot Command Channel", value="bot_channel"),
+            app_commands.Choice(name="Music Channel", value="music_channel"),
+            app_commands.Choice(name="Lovebirds", value="lovebirds"),
+            app_commands.Choice(name="Toten Channel", value="toten_channel"),
+            app_commands.Choice(name="Spiel Channel", value="spiel_channel"),
+            app_commands.Choice(name="Abstimmung", value="abstimmung"),
+        ]
+    )
+    async def map_channel(
+        self,
+        interaction: discord.Interaction,
+        bot_feature: app_commands.Choice[str],
+        discord_channel: discord.app_commands.AppCommandChannel,
+    ):
+        if (
+            interaction.user.id != interaction.guild.owner_id
+            and not interaction.user.guild_permissions.administrator
+        ):
+            await interaction.response.send_message(
+                "Only the Server Owner or an Administrator can run this.",
+                ephemeral=True,
+            )
+            return
+
+        from lib.db.models import Channel as DBChannel
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(DBChannel).where(DBChannel.name_bot == bot_feature.value)
+            )
+            db_chan = result.scalar_one_or_none()
+            if not db_chan:
+                db_chan = DBChannel(
+                    name_bot=bot_feature.value,
+                    id=discord_channel.id,
+                    name_guild=discord_channel.name,
+                    private=False,
+                )
+                session.add(db_chan)
+            else:
+                db_chan.id = discord_channel.id
+                db_chan.name_guild = discord_channel.name
+            await session.commit()
+
+        await interaction.response.send_message(
+            f"✅ Mapped **{bot_feature.name}** to {discord_channel.mention} (ID: {discord_channel.id}).",
+            ephemeral=True,
+        )
+
 
 async def setup(bot: My_Bot):
     await bot.add_cog(Admin(bot))

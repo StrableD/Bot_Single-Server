@@ -342,7 +342,9 @@ class Settings(Cog):
         loveChannel = interaction.guild.get_channel(await getChannelID("lovebirds"))
         removed_players = []
         for member in filter(
-            lambda player: isinstance(player, Member) and player != interaction.guild.owner,
+            lambda player: (
+                isinstance(player, Member) and player != interaction.guild.owner
+            ),
             loveChannel.overwrites,
         ):
             await loveChannel.set_permissions(member, overwrite=None)

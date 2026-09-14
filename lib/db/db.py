@@ -73,7 +73,10 @@ async def getLeagues():
         result = await session.execute(select(League))
         leagues = result.scalars().all()
         return {
-            league_info.LeagueName: (league_info.LowestElo or 0, league_info.HighestElo or 10000)
+            league_info.LeagueName: (
+                league_info.LowestElo or 0,
+                league_info.HighestElo or 10000,
+            )
             for league_info in leagues
         }
 

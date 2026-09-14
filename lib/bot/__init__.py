@@ -1,53 +1,32 @@
 import logging
 import logging.config
-import json
 import os
 
-from datetime import date
-from os.path import getmtime
-
-
-from discord import Guild, Intents, app_commands
-from discord.channel import DMChannel, TextChannel
-
+from discord import Guild, Intents
 from discord.ext.commands import Bot
 
-from discord.mentions import AllowedMentions
-from discord.message import Message
-
-
-from lib.db.db import getChannelID, updateMembers, AsyncSessionLocal, build
-
-from sqlalchemy import select, update
-from lib.helper.constants import BOTPATH, COGS, TOKEN
-
-from lib.helper.errors import NoPerms
-
-
+from lib.db.db import build, updateMembers
+from lib.helper.constants import COGS, TOKEN
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        'default': {
+        "default": {
             "class": "logging.Formatter",
-            'format': '%(asctime)s %(levelname)s %(name)s %(message)s'
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
         }
     },
     "handlers": {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'default',
-            'level': 'INFO'
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "default",
+            "level": "INFO",
         },
     },
-    "root": {
-        "handlers": ["console"],
-        "level": "INFO"
-    }
+    "root": {"handlers": ["console"], "level": "INFO"},
 }
 logging.config.dictConfig(LOGGING)
-
 
 
 class My_Bot(Bot):
@@ -58,19 +37,15 @@ class My_Bot(Bot):
             command_prefix="!",
             owner_id=owner_id,
             intents=Intents.all(),
-            debug_guilds=guild_ids if guild_ids else None
+            debug_guilds=guild_ids if guild_ids else None,
         )
 
         self.ready = False
         self.guild: Guild = None
         self.logger = logging.getLogger("My_Bot")
 
-
-
-
-
     async def setup_hook(self):
-        await build() # Initialize SQLAlchemy ORM schema
+        await build()  # Initialize SQLAlchemy ORM schema
         for cog in COGS:
             try:
                 await self.load_extension(f"lib.cogs.{cog}")
@@ -81,12 +56,8 @@ class My_Bot(Bot):
         await self.tree.sync()
         self.logger.info("setup complete")
 
-
-
     def run(self):
         super().run(TOKEN, reconnect=True)
-
-
 
     async def on_connect(self):
         self.logger.info("bot connected")
@@ -95,24 +66,19 @@ class My_Bot(Bot):
     async def on_disconnect(self):
         self.logger.info("bot disconnected")
 
-
-
     async def on_ready(self):
         if not self.ready:
             self.logger.info("bot reading up...")
 
             if self.guild:
-                await updateMembers(list(filter(lambda x: not x.bot, self.guild.members)))
+                await updateMembers(
+                    list(filter(lambda x: not x.bot, self.guild.members))
+                )
 
             self.ready = True
             self.logger.info("bot is ready")
         else:
             self.logger.info("bot reconnected")
-
-
-
-
-
 
 
 bot = My_Bot()

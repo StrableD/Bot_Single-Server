@@ -28,8 +28,10 @@ RUN mkdir -p /app/data/db /app/data/music_cache /app/config
 FROM base AS test
 # Install testing tools
 RUN pip install --no-cache-dir pytest pytest-asyncio ruff
-# Run syntax/linter checks
-RUN ruff check . --select=E9,F63,F7,F82
+# Run strict syntax/linter checks (Error, Fatal, Warning, Bugbear, Isort)
+RUN ruff check . --select=E,F,W,B,I --extend-ignore=E501
+# Run strict formatting enforcement (Build fails if code isn't perfectly formatted)
+RUN ruff format . --check
 # Run the automated test suite! If tests fail, the Docker build fails here.
 ENV PYTHONPATH=/app
 RUN python -m pytest tests/

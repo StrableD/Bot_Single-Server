@@ -1,1 +1,1 @@
-from .db import build
+from .db import build as build

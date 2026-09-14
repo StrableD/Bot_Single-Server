@@ -23,11 +23,11 @@ LG the developer [@StrableD](https://www.github.com/StrableD)
 The easiest way to run this bot is via Docker Compose.
 
 1. Clone the repository.
-2. Rename `.env.example` to `.env` and fill in your Discord Bot Token and Guild IDs.
+2. Rename `.env.example` to `.env` and fill in your Discord Bot Token, Guild IDs, and Owner ID.
 3. Run `docker-compose up -d --build`.
 
 Data (like the SQLite database and music cache) will be saved persistently in the `data/` volume.
-Game settings (roles, timings, emojis) can be freely edited in `config/game_config.yaml`.
+Game settings (e.g. roles) can be edited in `config/game_config.yaml`.
 
 ## Usage & Commands
 

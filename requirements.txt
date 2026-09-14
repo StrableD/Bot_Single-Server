@@ -1,7 +1,4 @@
-discord-ext-menus==1.1
 discord.py==2.4.0
-toml==0.10.2
-APScheduler==3.11.0
 word2number==1.1
 pyee==12.1.1
 numpy==2.2.1

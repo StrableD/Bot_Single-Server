@@ -6,8 +6,7 @@ from asyncio.tasks import sleep
 from datetime import date
 from os.path import getmtime
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
+
 from discord import Guild, Intents, app_commands
 from discord.channel import DMChannel, TextChannel
 
@@ -17,8 +16,8 @@ from discord.mentions import AllowedMentions
 from discord.message import Message
 from pyee.asyncio import AsyncIOEventEmitter
 
-from lib.db.db import autosave, getChannelID, updateMembers, AsyncSessionLocal, build
-from lib.db.models import BotState
+from lib.db.db import getChannelID, updateMembers, AsyncSessionLocal, build
+
 from sqlalchemy import select, update
 from lib.helper.constants import BOTPATH, COGS, TOKEN
 
@@ -77,13 +76,13 @@ class My_Bot(Bot):
 
 
         self.guild: Guild = None
-        self.scheduler = AsyncIOScheduler()
+
         self.emitter = AsyncIOEventEmitter()
         self.logger = logging.getLogger("My_Bot")
 
 
 
-        autosave(self.scheduler)
+
 
     async def setup_hook(self):
         await build() # Initialize SQLAlchemy ORM schema
@@ -97,8 +96,7 @@ class My_Bot(Bot):
         await self.tree.sync()
         self.logger.info("setup complete")
 
-    async def update_bot(self):
-        pass
+
 
     def run(self):
         super().run(TOKEN, reconnect=True)
@@ -117,10 +115,6 @@ class My_Bot(Bot):
     async def on_ready(self):
         if not self.ready:
             self.logger.info("bot reading up...")
-            self.scheduler.start()
-            self.scheduler.add_job(
-                self.update_bot, CronTrigger(day_of_week=3, hour=5, minute=0, second=0)
-            )
 
             if self.guild:
                 await updateMembers(list(filter(lambda x: not x.bot, self.guild.members)))

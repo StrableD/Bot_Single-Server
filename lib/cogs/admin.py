@@ -23,8 +23,8 @@ class SetupWizard(discord.ui.View):
         embed = discord.Embed(
             title="Setup Wizard",
             description="Welcome! Would you like to run the Automatic or Manual setup?\n\n"
-                        "**Automatic**: I will try to guess your roles and ask if I should create them if missing.\n"
-                        "**Manual**: I will walk through every role and let you pick the Discord role from a dropdown.",
+                        "**Automatic**: I will automatically create or find secret 'DBVM???' roles for game roles, and named roles for public roles.\n"
+                        "**Manual**: I will walk through every role and let you pick from a dropdown of unmapped Discord roles (showing their IDs).",
             color=discord.Color.blue()
         )
         btn_auto = discord.ui.Button(label="Automatic", style=discord.ButtonStyle.green)
@@ -82,11 +82,25 @@ class SetupWizard(discord.ui.View):
                 db_role.name_guild = guild_name
             await session.commit()
 
+    def get_target_role_name(self, role_name: str) -> str:
+        public_roles = ["tot", "hauptmann", "spielleiter", "gamemaster"]
+        if role_name.lower() in public_roles:
+            return role_name
+        return "DBVM???"
+
     async def handle_auto_step(self, interaction: discord.Interaction, role_name: str):
+        target_name = self.get_target_role_name(role_name)
         guild = interaction.guild
         guessed_role = None
+        
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(DBRole.id))
+            mapped_ids = {r[0] for r in result.fetchall()}
+            
         for r in guild.roles:
-            if role_name.lower() in r.name.lower():
+            if r.id in mapped_ids:
+                continue
+            if r.name == target_name:
                 guessed_role = r
                 break
                 
@@ -96,7 +110,7 @@ class SetupWizard(discord.ui.View):
         btn_cancel.callback = cancel_cb
                 
         if guessed_role:
-            embed = discord.Embed(title=f"Role Setup: {role_name}", description=f"I guessed this matches your existing Discord role: {guessed_role.mention}\nIs this correct?", color=discord.Color.gold())
+            embed = discord.Embed(title=f"Role Setup: {role_name}", description=f"Found unmapped Discord role **{guessed_role.name}** (ID: `{guessed_role.id}`).\nMap this to game role **{role_name}**?", color=discord.Color.gold())
             
             btn_yes = discord.ui.Button(label="Yes", style=discord.ButtonStyle.green)
             btn_no = discord.ui.Button(label="No, ask to create", style=discord.ButtonStyle.danger)
@@ -109,7 +123,7 @@ class SetupWizard(discord.ui.View):
                 
             async def no_cb(i: discord.Interaction):
                 await i.response.defer()
-                await self.prompt_create(i, role_name)
+                await self.prompt_create(i, role_name, target_name)
                 
             btn_yes.callback = yes_cb
             btn_no.callback = no_cb
@@ -123,13 +137,13 @@ class SetupWizard(discord.ui.View):
             else:
                 await interaction.response.edit_message(embed=embed, view=self)
         else:
-            await self.prompt_create(interaction, role_name)
+            await self.prompt_create(interaction, role_name, target_name)
 
-    async def prompt_create(self, interaction: discord.Interaction, role_name: str):
+    async def prompt_create(self, interaction: discord.Interaction, role_name: str, target_name: str):
         self.clear_items()
-        embed = discord.Embed(title=f"Role Setup: {role_name}", description=f"I couldn't find a matching Discord role for **{role_name}**.\nShould I create it for you?", color=discord.Color.red())
+        embed = discord.Embed(title=f"Role Setup: {role_name}", description=f"I couldn't find an unmapped Discord role named **{target_name}**.\nShould I create it for you?", color=discord.Color.red())
         
-        btn_create = discord.ui.Button(label="Yes, Create It", style=discord.ButtonStyle.green)
+        btn_create = discord.ui.Button(label=f"Create as '{target_name}'", style=discord.ButtonStyle.green)
         btn_skip = discord.ui.Button(label="Skip", style=discord.ButtonStyle.secondary)
         btn_cancel = discord.ui.Button(label="Cancel Setup", style=discord.ButtonStyle.danger, row=2)
         
@@ -139,7 +153,7 @@ class SetupWizard(discord.ui.View):
         async def create_cb(i: discord.Interaction):
             await i.response.defer()
             try:
-                new_role = await i.guild.create_role(name=role_name, hoist=True)
+                new_role = await i.guild.create_role(name=target_name, hoist=True)
                 await self.save_role_to_db(role_name, new_role.name, new_role.id)
             except discord.Forbidden:
                 await i.followup.send("I lack permissions to create roles! Skipping...", ephemeral=True)
@@ -166,27 +180,16 @@ class SetupWizard(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=self)
 
     async def handle_manual_step(self, interaction: discord.Interaction, role_name: str):
-        embed = discord.Embed(title=f"Role Setup: {role_name}", description=f"Please select the Discord role that corresponds to the game role **{role_name}**.", color=discord.Color.purple())
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(DBRole.id))
+            mapped_ids = {r[0] for r in result.fetchall()}
+            
+        unmapped_roles = [r for r in interaction.guild.roles if r.id not in mapped_ids and r.name != "@everyone"]
+        unmapped_roles = unmapped_roles[:25] # Select limits to 25 options
         
-        select_menu = discord.ui.RoleSelect(placeholder="Choose a role...", min_values=1, max_values=1)
         btn_skip = discord.ui.Button(label="Skip", style=discord.ButtonStyle.secondary, row=1)
         btn_cancel = discord.ui.Button(label="Cancel Setup", style=discord.ButtonStyle.danger, row=1)
         
-        async def select_cb(i: discord.Interaction):
-            selected_role = select_menu.values[0]
-            # Check if this role is already mapped in the database
-            async with AsyncSessionLocal() as session:
-                res = await session.execute(select(DBRole).where(DBRole.id == selected_role.id))
-                existing = res.scalar_one_or_none()
-                if existing and existing.id != 0 and existing.name_bot != role_name.lower().replace("-", "").replace(" ", ""):
-                    await i.response.send_message(f"Error: The role {selected_role.mention} is already mapped to {existing.name_guild}!", ephemeral=True)
-                    return
-            
-            await self.save_role_to_db(role_name, selected_role.name, selected_role.id)
-            self.current_idx += 1
-            await i.response.defer()
-            await self.next_step(i)
-            
         async def skip_cb(i: discord.Interaction):
             await self.save_role_to_db(role_name, role_name, 0)
             self.current_idx += 1
@@ -196,9 +199,33 @@ class SetupWizard(discord.ui.View):
         async def cancel_cb(i: discord.Interaction):
             await i.response.edit_message(content="❌ Setup Cancelled.", embed=None, view=None)
             
-        select_menu.callback = select_cb
         btn_skip.callback = skip_cb
         btn_cancel.callback = cancel_cb
+        
+        if not unmapped_roles:
+            embed = discord.Embed(title=f"Role Setup: {role_name}", description="There are no more unmapped roles available in the server!", color=discord.Color.red())
+            self.add_item(btn_skip)
+            self.add_item(btn_cancel)
+            if interaction.response.is_done():
+                await interaction.edit_original_response(embed=embed, view=self)
+            else:
+                await interaction.response.edit_message(embed=embed, view=self)
+            return
+
+        embed = discord.Embed(title=f"Role Setup: {role_name}", description=f"Please select the Discord role that corresponds to the game role **{role_name}**.\nOnly unmapped roles are shown below.", color=discord.Color.purple())
+        
+        options = [discord.SelectOption(label=r.name[:100], description=f"ID: {r.id}", value=str(r.id)) for r in unmapped_roles]
+        select_menu = discord.ui.Select(placeholder="Choose a role...", min_values=1, max_values=1, options=options)
+        
+        async def select_cb(i: discord.Interaction):
+            selected_role_id = int(select_menu.values[0])
+            selected_role = interaction.guild.get_role(selected_role_id)
+            await self.save_role_to_db(role_name, selected_role.name, selected_role.id)
+            self.current_idx += 1
+            await i.response.defer()
+            await self.next_step(i)
+            
+        select_menu.callback = select_cb
         
         self.add_item(select_menu)
         self.add_item(btn_skip)

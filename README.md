@@ -12,10 +12,11 @@ LG the developer [@StrableD](https://www.github.com/StrableD)
 ## Features
 
 - **Game Cadre Management**: Set up the game cadre for the current round (which roles are included).
-- **In-Game Roles**: Automatically assign roles to players and move them into the corresponding voice channel.
-- **Night Phase Manager**: Automatically announce who wakes up at night in the right order using `/next_phase`.
+- **Interactive Match Lobby**: Gamemasters can spin up a lobby via `/gm start` where players can natively join through Discord UI buttons.
+- **Action Request System**: Players queue role actions targeting each other directly via `/game action`, allowing the Gamemaster to review and approve them transparently.
+- **Setup Wizard**: Fully interactive setup wizard using `/admin setup` to cleanly provision secret ("DBVM???") roles and public roles securely across the server.
 - **Music**: Cached YouTube music playback for background atmosphere (using `yt-dlp` and `ffmpeg`).
-- **Elo System**: Built in ranking for players!
+- **Elo System**: Built-in ranking for players!
 
 ## Deployment (Docker)
 
@@ -31,8 +32,8 @@ Game settings (roles, timings, emojis) can be freely edited in `config/game_conf
 ## Usage & Commands
 
 The bot utilizes Discord's modern Application Commands (Slash Commands).
-- **Gamemaster Commands**: Gamemasters can manage the game state with commands like `/start`, `/dead`, `/captain`, `/love`, and `/next_phase`.
-- **Player Commands**: Players can use `/choose` during Role Choice mode, or check their Elo rating with `/elo`.
-- **Settings**: Adjust the game cadre using `/fill`, `/minus`, `/cadre`, `/change`, and `/standardkader`.
+- **Gamemaster Commands**: Gamemasters can manage the game state with commands like `/gm start`, `/gm stop`, and `/gm phase`.
+- **Player Commands**: Players can check their Elo rating with `/elo`, view the current cadre with `/game current_cadre`, and submit actions via `/game action`.
+- **Settings**: Adjust the game cadre using `/cadre change` and `/cadre standardkader`.
 
 Note: Commands that reveal sensitive state will respond as Ephemeral messages to the invoking user.

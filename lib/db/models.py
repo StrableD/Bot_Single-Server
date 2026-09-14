@@ -37,18 +37,9 @@ class League(Base):
     LowestElo = Column(Integer)
     HighestElo = Column(Integer)
 
-class Game(Base):
-    __tablename__ = 'games'
-    GameNumber = Column(Integer, primary_key=True, autoincrement=True)
-    GameDict = Column(JSON)
-    EloDict = Column(JSON)
-    winner = Column(String)
-    evaluated = Column(Boolean, default=False)
 
-class BotState(Base):
-    __tablename__ = 'bot_state'
-    key = Column(String, primary_key=True)
-    value = Column(String)
+
+
 
 class GameCadre(Base):
     __tablename__ = 'game_cadre'

@@ -74,6 +74,10 @@ class LobbyView(discord.ui.View):
     async def start_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
+        import random
+
+        from lib.db.cadre_db import getCadre, setCurrentGameCadre
+
         async with db.AsyncSessionLocal() as session:
             lobby = await session.get(Lobby, self.lobby_id)
             if not lobby or not lobby.is_active:
@@ -93,15 +97,13 @@ class LobbyView(discord.ui.View):
                 return
 
             # Check if cadre matches player count
-            players = await session.execute(
-                select(LobbyPlayer.player_id).where(
-                    LobbyPlayer.lobby_id == self.lobby_id
-                )
+            players_res = await session.execute(
+                select(LobbyPlayer).where(LobbyPlayer.lobby_id == self.lobby_id)
             )
-            player_ids = [p[0] for p in players.fetchall()]
+            lp_objects = players_res.scalars().all()
+            player_ids = [p.player_id for p in lp_objects]
 
-            cadre = await getCurrentGameCadre()
-            # Simple check for now
+            cadre = await getCadre(interaction.guild)
             cadre_length = sum(cadre.values()) if cadre else 0
 
             if len(player_ids) < cadre_length:
@@ -118,16 +120,49 @@ class LobbyView(discord.ui.View):
                 return
 
             lobby.is_active = False
+
+            # Save the current game cadre
+            await setCurrentGameCadre(cadre)
+
+            # Assign roles
+            role_pool = []
+            for role_name, count in cadre.items():
+                role_pool.extend([role_name.lower()] * count)
+
+            random.shuffle(role_pool)
+
+            for lp in lp_objects:
+                lp.role = role_pool.pop()
+
             await session.commit()
 
             # Disable buttons
             for child in self.children:
                 child.disabled = True
-            await interaction.response.edit_message(
-                content="Match is starting...", view=self
-            )
 
-            # To-Do: Assign roles, move to voice channels
+            try:
+                await interaction.response.edit_message(
+                    content="Match is starting...", view=self
+                )
+            except discord.errors.InteractionResponded:
+                await interaction.followup.edit_message(
+                    interaction.message.id, content="Match is starting...", view=self
+                )
+
+            # Inform players
+            for lp in lp_objects:
+                member = interaction.guild.get_member(lp.player_id)
+                if member:
+                    try:
+                        await member.send(
+                            f"Your role for the game is: **{lp.role.title()}**"
+                        )
+                    except Exception:
+                        pass
+
+            await interaction.followup.send(
+                "Match started! Roles have been assigned.", ephemeral=True
+            )
 
     @discord.ui.button(
         label="Cancel Lobby", style=discord.ButtonStyle.danger, custom_id="lobby_cancel"
@@ -277,7 +312,9 @@ class Game(Cog):
                 )
                 return
 
-            cadre = await getCurrentGameCadre()
+            from lib.db.cadre_db import getCadre
+
+            cadre = await getCadre(interaction.guild)
             cadre_length = sum(cadre.values()) if cadre else 0
 
             lobby = Lobby(gamemaster_id=interaction.user.id)

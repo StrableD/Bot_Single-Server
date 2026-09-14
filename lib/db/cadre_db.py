@@ -2,12 +2,12 @@ import json
 
 from sqlalchemy import select
 
-from lib.db.db import AsyncSessionLocal
+from lib.db import db
 from lib.db.models import GameCadre
 
 
 async def get_cadre(cadre_type: str, guild=None) -> dict:
-    async with AsyncSessionLocal() as session:
+    async with db.AsyncSessionLocal() as session:
         result = await session.execute(
             select(GameCadre).where(GameCadre.cadre_type == cadre_type)
         )
@@ -20,7 +20,7 @@ async def get_cadre(cadre_type: str, guild=None) -> dict:
 
 
 async def set_cadre(cadre_type: str, data: dict):
-    async with AsyncSessionLocal() as session:
+    async with db.AsyncSessionLocal() as session:
         result = await session.execute(
             select(GameCadre).where(GameCadre.cadre_type == cadre_type)
         )

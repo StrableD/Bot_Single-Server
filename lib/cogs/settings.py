@@ -1,102 +1,97 @@
-from pathlib import Path
 from typing import Optional
 
-from discord import Colour, Embed, Guild, Emoji, Member
+import discord
+from discord import Colour, Embed, Member, app_commands
 from discord.channel import TextChannel
-from discord.ext.commands import Cog, Context, hybrid_command, has_role
+from discord.ext.commands import Cog
 from discord.utils import get
-from num2words import num2words  # type: ignore
-from word2number import w2n
 
 from lib.bot import My_Bot
-from lib.db.db import getChannelID, getRoleID
-from lib.helper.constants import (
-    BOTPATH,
-    EMOJIS,
-    MyRoleConverter,
-    getCadre,
-    setDefaultCadre,
-    setPlayingCadre,
-)
+from lib.db.cadre_db import getCadre, setDefaultCadre, setPlayingCadre
+from lib.db.db import getChannelID
+from lib.helper.checks import is_gamemaster
 
 
-async def updateEmojis(guild: Guild, emojis: list[int]):
-    returnEmojis = []
-    emojisToAdd = []
-    for image in Path(BOTPATH + "/data/emojis").glob("*.png"):
-        for emoji in emojis:
-            if image.name == f"keycap_{num2words(emoji)}.png":
-                emojisToAdd.append(image)
-                continue
-    for emoji in emojisToAdd:
-        if emoji.stem not in list(map(lambda m: m.name, guild.emojis)):
-            addedEmoji = await guild.create_custom_emoji(
-                name=emoji.stem, image=open(emoji, "rb").read()
+class SurveyView(discord.ui.View):
+    def __init__(
+        self, interaction: discord.Interaction, theme: str, content: list[tuple]
+    ):
+        super().__init__(timeout=300)
+        self.interaction = interaction
+        self.result = None
+
+        options = []
+        for i, (name, value) in enumerate(content):
+            val_str = str(value) if str(value).isdigit() else str(i + 1)
+            options.append(
+                discord.SelectOption(
+                    label=name[:100], description=str(value)[:100], value=val_str
+                )
             )
-            returnEmojis.append(addedEmoji)
-    return returnEmojis
+
+        self.select = discord.ui.Select(placeholder=theme[:100], options=options[:25])
+
+        async def select_callback(i: discord.Interaction):
+            self.result = int(self.select.values[0])
+            await i.response.defer()
+            self.stop()
+
+        self.select.callback = select_callback
+        self.add_item(self.select)
 
 
-async def takeSurvey(ctx: Context, theme: str, content: list[tuple]):
-    embed = Embed(
-        title="Bitte auswählen", description=theme, color=Colour.from_rgb(12, 190, 220)
-    )
-    emojiNums = []
-    for name, value in content:
-        if value.isdigit():
-            emojiNums.append(int(value))
-        else:
-            emojiNums.append(content.index((name, value)) + 1)
-        embed.add_field(name=name, value=value, inline=True)
-    updatedEmojis = await updateEmojis(ctx.guild, emojiNums)
-    msg = await ctx.send(embed=embed)
-    for emoji in emojiNums:
-        if emoji <= 10:
-            await msg.add_reaction(EMOJIS[emoji])
-        else:
-            for guildEmoji in ctx.guild.emojis:
-                if guildEmoji.name == f"keycap_{num2words(emoji)}":
-                    await msg.add_reaction(guildEmoji)
-    reaction, user = await ctx.bot.wait_for(
-        "reaction_add",
-        check=lambda m, u: (str(m) in EMOJIS.values() if type(m.emoji) == str else m.emoji.name in map(lambda x: f"keycap_{num2words(x)}", emojiNums)) and not u.bot,
-    )
-    await msg.delete()
-    ctx.bot.emitter.emit("delEmojis", updatedEmojis)
-    if str(reaction) in EMOJIS.values():
-        for number, string in EMOJIS.items():
-            if str(reaction) == string:
-                return number
+async def takeSurvey(
+    interaction: discord.Interaction, theme: str, content: list[tuple]
+):
+    view = SurveyView(interaction, theme, content)
+
+    if interaction.response.is_done():
+        await interaction.followup.send(
+            content=f"**{theme}**", view=view, wait=True, ephemeral=True
+        )
     else:
-        reaction = str(reaction.emoji.name)[7:]
-        return w2n.word_to_num(reaction)
+        await interaction.response.send_message(
+            content=f"**{theme}**", view=view, ephemeral=True
+        )
+        await interaction.original_response()
+
+    await view.wait()
+    await interaction.edit_original_response(view=None)
+    return view.result
 
 
 class Settings(Cog):
     def __init__(self, bot: My_Bot):
         self.bot = bot
-        self.bot.emitter.on("delEmojis", self.delEmojis)
 
-    @property
-    def cadreLength(self):
-        game = self.bot.get_cog("Game")
-        return game.cadreLength  # type:ignore
+    cadre_group = app_commands.Group(name="cadre", description="Cadre management")
+
+    async def cadreLength(self):
+        from lib.db.cadre_db import getCadre
+
+        cadre = await getCadre()
+        length = 0
+        for num in cadre.values():
+            length += num
+        return length
 
     @staticmethod
-    async def getNewCadre(ctx: Context):
+    async def getNewCadre(interaction: discord.Interaction):
         content = []
-        for channel in ctx.guild.get_channel(
-                await getChannelID("default_cadre")
+        for channel in interaction.guild.get_channel(
+            await getChannelID("default_cadre")
         ).text_channels:
             content.append((channel.name, channel.name[:2]))
-        cadreSize = await takeSurvey(ctx, "Welche Kadergröße hättest du gerne", content)
+        cadreSize = await takeSurvey(
+            interaction, "Welche Kadergröße hättest du gerne", content
+        )
 
         channelName = ""
         for name, number in content:
             if cadreSize == int(number.strip(" -")):
                 channelName = name
                 break
-        channel = get(ctx.guild.channels, name=channelName)
+        channel = get(interaction.guild.channels, name=channelName)
 
         content.clear()
         async for message in channel.history():
@@ -107,7 +102,9 @@ class Settings(Cog):
                     break
                 value.append(row.strip())
             content.append((splitMessage[0], "\n".join(value)))
-        cadreNum = await takeSurvey(ctx, "Welchen der Kader willst du haben?", content)
+        cadreNum = await takeSurvey(
+            interaction, "Welchen der Kader willst du haben?", content
+        )
 
         squad = content[cadreNum - 1][1]
         squadDict = dict()
@@ -121,15 +118,18 @@ class Settings(Cog):
                 squadDict[role] += 1
         return squadDict
 
-    @commands.hybrid_command(name="standardkader", aliases=["dafaultcadre", "defcadre"])
-    @has_role(await getRoleID("gamemaster"))
-    async def setDefaultCadre(self, ctx: Context):
+    @cadre_group.command(
+        name="standardkader", description="Legt den Standard-Kader fest."
+    )
+    @is_gamemaster()
+    async def setDefaultCadre(self, interaction: discord.Interaction):
         """
         Hiermit kannst du den Standard-Kader des Bots festlegen.
         Er wird aus den auf dem Server angegebenen Standard-Kadern ausgewählt.
         Der Standard-Kader wird automatisch für das Spiel ausgewählt, wenn vorher kein anderer ausgewählt wird.
         """
-        squadDict = await self.getNewCadre(ctx)
+        await interaction.response.defer(ephemeral=True)
+        squadDict = await self.getNewCadre(interaction)
 
         await setDefaultCadre(squadDict)
 
@@ -140,29 +140,33 @@ class Settings(Cog):
         for role, num in squadDict.items():
             value += f"{str(role).title()}: {num}\n"
 
-        embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
-        await ctx.send(embed=embed, delete_after=60.0)
+        embed.add_field(name=f"{await self.cadreLength()}er Kader", value=value)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @commands.hybrid_command(name="change", aliases=["ändern", "wechseln"])
-    @has_role(await getRoleID("gamemaster"))
-    async def changeCadre(self, ctx: Context, clear: Optional[str] = None):
+    @cadre_group.command(name="change", description="Ändert den aktuellen Spielekader.")
+    @app_commands.describe(clear="Gibt an, ob der Kader zurückgesetzt wird")
+    @is_gamemaster()
+    async def changeCadre(
+        self, interaction: discord.Interaction, clear: Optional[str] = None
+    ):
         """
         Hiermit änderst du den aktuellen Spielekader.
         Er wird aus den auf dem Server angegeben Standard-Kadern ausgewählt.
         Wenn dieser nicht eingestellt ist, dann wird der Standard-Kader des Bots verwendet.
-        ``clear``: Gibt an, ob der Kader zurückgesetzt wird (optional)
         """
+        await interaction.response.defer(ephemeral=True)
         if bool(clear):
             if clear.lower() not in ("y", "j", "yes", "ja", "t", "true", "1", "on"):
+                await interaction.followup.send("Abbruch.", ephemeral=True)
                 return
             await setPlayingCadre({})
-            await ctx.send(
+            await interaction.followup.send(
                 "Der bisher ausgewählte Spielekader wurde gelöscht. Wenn gespielt wird, wird der Standardkader benutzt.",
-                delete_after=20.0,
+                ephemeral=True,
             )
             return
 
-        squadDict = await self.getNewCadre(ctx)
+        squadDict = await self.getNewCadre(interaction)
 
         await setPlayingCadre(squadDict)
 
@@ -173,56 +177,69 @@ class Settings(Cog):
         for role, num in squadDict.items():
             value += f"{str(role).title()}: {num}\n"
 
-        embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
-        await ctx.send(embed=embed, delete_after=60.0)
+        embed.add_field(name=f"{await self.cadreLength()}er Kader", value=value)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
-    # last stand with lukas
-    @commands.hybrid_command(name="fill", aliases=["hinzufügen", "add"])
-    @has_role(await getRoleID("gamemaster"))
-    async def addCitizen(self, ctx: Context):
+    @cadre_group.command(
+        name="fill",
+        description="Fügt dem aktuellen Spielekader einen Dorfbewohner hinzu.",
+    )
+    @is_gamemaster()
+    async def addCitizen(self, interaction: discord.Interaction):
         """
         Zu dem aktuellen Spielekader wird ein Dorfbewohner hinzugefügt.
         Wenn es noch keinen Spielekader gibt, dann wird zu dem Standartkader ein Dorfbewohner hinzugefügt.
         Der Standartkader wird dann zum Spielekader.
         """
+        await interaction.response.defer(ephemeral=True)
         cadre = await getCadre()
         if "dorfbewohner" not in cadre:
             cadre["dorfbewohner"] = 1
         else:
             cadre["dorfbewohner"] += 1
         await setPlayingCadre(cadre)
-        await self.returnCadre(ctx)
+        await self.returnCadre(interaction)
 
-    @commands.hybrid_command(name="minus", aliases=["entfernen", "sub"])
-    @has_role(await getRoleID("gamemaster"))
-    async def removeCitizen(self, ctx: Context):
+    @cadre_group.command(
+        name="minus", description="Entfernt einen Dorfbewohner aus dem aktuellen Kader."
+    )
+    @is_gamemaster()
+    async def removeCitizen(self, interaction: discord.Interaction):
         """
         Von dem aktuellen Kader wird ein Dorfbewohner entfernt.
         Wenn es noch keinen Spielekader gibt, dann wird zu dem Standartkader ein Dorfbewohner entfernt.
         Der Standartkader wird dann zum Spielekader.
         Wenn es keine Dorfbewohner mehr gibt, dann passiert nichts.
         """
+        await interaction.response.defer(ephemeral=True)
         cadre = await getCadre()
         if "dorfbewohner" in cadre:
             cadre["dorfbewohner"] -= 1
             if cadre["dorfbewohner"] == 0:
                 del cadre["dorfbewohner"]
-                await ctx.send(
+                await interaction.followup.send(
                     "Jetzt gibt es keine Dorfbewohner mehr im aktuellen Kader!",
-                    delete_after=20.0,
+                    ephemeral=True,
                 )
+                await setPlayingCadre(cadre)
+                return
         else:
-            await ctx.send(
-                "Es gibt keine Dorfbewohner mehr im aktuellen Kader!", delete_after=20.0
+            await interaction.followup.send(
+                "Es gibt keine Dorfbewohner mehr im aktuellen Kader!", ephemeral=True
             )
-        await setPlayingCadre(cadre)
-        await self.returnCadre(ctx)
+            return
 
-    @commands.hybrid_command(name="cadre", aliases=["kader"])
-    async def returnCadre(self, ctx: Context):
+        await setPlayingCadre(cadre)
+        await self.returnCadre(interaction)
+
+    @cadre_group.command(name="list", description="Gibt den aktuellen Kader zurück.")
+    async def returnCadre(self, interaction: discord.Interaction):
         """
         Gibt den aktuellen Kader zurück.
         """
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
         cadre = await getCadre()
         embed = Embed(
             title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
@@ -231,14 +248,19 @@ class Settings(Cog):
         for role, num in cadre.items():
             value += f"{str(role).title()}: {num}\n"
 
-        embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
-        await ctx.send(embed=embed, delete_after=60.0)
+        embed.add_field(name=f"{await self.cadreLength()}er Kader", value=value)
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @commands.hybrid_command(name="set_role", aliases=["gibRolle", "role"])
-    @has_role(await getRoleID("gamemaster"))
-    async def setPlayerRole(self, ctx: Context, player: Member, role: MyRoleConverter):
+    @app_commands.command(name="set_role", description="Gibt einem Spieler eine Rolle.")
+    @app_commands.describe(player="Der Spieler", role="Die Rolle")
+    @is_gamemaster()
+    async def setPlayerRole(
+        self, interaction: discord.Interaction, player: Member, role: discord.Role
+    ):
+        await interaction.response.defer(ephemeral=True)
+
         await player.add_roles(role)
-        await ctx.send(
+        await interaction.followup.send(
             embed=Embed(
                 title="Rollen des Spielers",
                 description=f"Der Spieler {player.display_name} hat folgende Rollen:",
@@ -246,64 +268,84 @@ class Settings(Cog):
             ).add_field(
                 name="rollen", value="\n".join(map(lambda x: x.name, player.roles))
             ),
-            delete_after=100.0,
+            ephemeral=True,
         )
 
-    @commands.hybrid_command(name="delete", aliases=["lösche", "del"])
-    @has_role(await getRoleID("gamemaster"))
-    async def deleteMessages(self, ctx: Context, number: Optional[int] = 1, channel: Optional[TextChannel] = None):
+    @app_commands.command(
+        name="delete", description="Löscht die angegebene Anzahl an Nachrichten."
+    )
+    @app_commands.describe(number="Die Anzahl der Nachrichten", channel="Der Kanal")
+    @is_gamemaster()
+    async def deleteMessages(
+        self,
+        interaction: discord.Interaction,
+        number: Optional[int] = 1,
+        channel: Optional[TextChannel] = None,
+    ):
         """
         Löscht die angegebene Anzahl an Nachrichten im angegebenen Kanal.
-        ```number```: Die Anzahl der Nachrichten. (optional)
-        ```channel```: Der Kanal, in dem die Nachrichten gelöscht werden sollen. (optional)
         """
-        await ctx.message.delete()
+        await interaction.response.defer(ephemeral=True)
 
         if channel is None:
-            channel = ctx.channel
+            channel = interaction.channel
+
         async for message in channel.history(limit=number, oldest_first=False):
             await message.delete()
 
-        await ctx.send(
-            embed=Embed(
-                title="Gelöschte Nachrichten", colour=Colour.teal()
-            ).add_field(name="anzahl", value=str(number)),
-            delete_after=60.0,
+        await interaction.followup.send(
+            embed=Embed(title="Gelöschte Nachrichten", colour=Colour.teal()).add_field(
+                name="anzahl", value=str(number)
+            ),
+            ephemeral=True,
         )
 
-    @commands.hybrid_command(name="clear", aliases=["aufräumen", "leeren"])
-    @has_role(await getRoleID("gamemaster"))
-    async def clearGameChannels(self, ctx: Context):
+    @app_commands.command(
+        name="clear", description="Räumt die Kanäle, in denen gespielt wird, auf."
+    )
+    @is_gamemaster()
+    async def clearGameChannels(self, interaction: discord.Interaction):
         """
         Die Kanäle, in denen gespielt wird, werden aufgeräumt.
         Alle Nachrichten in den Kanälen unterhalb der Kategorie Morbach werden geleert.
         Ausgenommen sind die Bot-Kanäle
         """
-        game_category = ctx.guild.get_channel(await getChannelID("game_category"))
+        await interaction.response.defer(ephemeral=True)
+
+        game_category = interaction.guild.get_channel(
+            await getChannelID("game_category")
+        )
         bot_channels = tuple(
-            ctx.guild.get_channel(await getChannelID(x))
+            interaction.guild.get_channel(await getChannelID(x))
             for x in ("bot_channel", "music_channel")
         )
         numMsgs = 0
 
-        msg = await ctx.send("Die Nachrichten werden geslöscht.\nDies kann einen Moment dauern.")
+        await interaction.followup.send(
+            "Die Nachrichten werden gelöscht.\nDies kann einen Moment dauern.",
+            ephemeral=True,
+        )
 
         for category in filter(
-                lambda c: c.position >= game_category.position, ctx.guild.categories
+            lambda c: c.position >= game_category.position, interaction.guild.categories
         ):
             for channel in filter(
-                    lambda c: type(c) == TextChannel and c not in bot_channels,
-                    category.channels,
+                lambda c: isinstance(c, TextChannel) and c not in bot_channels,
+                category.channels,
             ):
-                while history := await channel.history(oldest_first=True, limit=50).flatten():
+                while history := await channel.history(
+                    oldest_first=True, limit=50
+                ).flatten():
                     for message in history:
                         await message.delete()
                         numMsgs += 1
-        loveChannel = ctx.guild.get_channel(await getChannelID("lovebirds"))
+        loveChannel = interaction.guild.get_channel(await getChannelID("lovebirds"))
         removed_players = []
         for member in filter(
-                lambda player: type(player) == Member and player != ctx.guild.owner,
-                loveChannel.overwrites,
+            lambda player: (
+                isinstance(player, Member) and player != interaction.guild.owner
+            ),
+            loveChannel.overwrites,
         ):
             await loveChannel.set_permissions(member, overwrite=None)
             removed_players.append(member.display_name)
@@ -311,22 +353,13 @@ class Settings(Cog):
         embed = Embed(
             title="Gelöschte Nachrichten",
             description="Die Kanäle wurden geleert.",
-            colour=Colour.teal())
+            colour=Colour.teal(),
+        )
         embed.add_field(name="anzahl", value=str(numMsgs))
         if removed_players:
             embed.add_field(name="liebespaar", value="\n".join(removed_players))
-        await msg.delete()
-        await ctx.send(embed=embed, delete_after=100.0)
 
-    @staticmethod
-    async def delEmojis(EmojiList: list[Emoji]):
-        for emoji in EmojiList:
-            await emoji.delete()
-
-    @Cog.listener()
-    async def on_ready(self):
-        if not self.bot.ready:
-            self.bot.cogs_ready.ready_up("settings")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot):

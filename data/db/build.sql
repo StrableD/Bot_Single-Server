@@ -39,4 +39,14 @@ CREATE TABLE IF NOT EXISTS games (
     EloDict json, --json-dict[discord.Member, int]
     winner text,
     evaluated boolean DEFAULT False
-)
+);
+--Bot Einstellungen und Status
+CREATE TABLE IF NOT EXISTS bot_state (
+    key text PRIMARY KEY,
+    value text
+);
+--Kader
+CREATE TABLE IF NOT EXISTS game_cadre (
+    cadre_type text PRIMARY KEY,
+    data json
+);

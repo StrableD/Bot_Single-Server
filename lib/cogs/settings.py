@@ -3,7 +3,7 @@ from typing import Optional
 
 from discord import Colour, Embed, Guild, Emoji, Member
 from discord.channel import TextChannel
-from discord.ext.commands import Cog, Context, command, has_role
+from discord.ext.commands import Cog, Context, hybrid_command, has_role
 from discord.utils import get
 from num2words import num2words  # type: ignore
 from word2number import w2n
@@ -86,7 +86,7 @@ class Settings(Cog):
     async def getNewCadre(ctx: Context):
         content = []
         for channel in ctx.guild.get_channel(
-                getChannelID("default_cadre")
+                await getChannelID("default_cadre")
         ).text_channels:
             content.append((channel.name, channel.name[:2]))
         cadreSize = await takeSurvey(ctx, "Welche Kadergröße hättest du gerne", content)
@@ -121,8 +121,8 @@ class Settings(Cog):
                 squadDict[role] += 1
         return squadDict
 
-    @command(name="standardkader", aliases=["dafaultcadre", "defcadre"])
-    @has_role(getRoleID("gamemaster"))
+    @commands.hybrid_command(name="standardkader", aliases=["dafaultcadre", "defcadre"])
+    @has_role(await getRoleID("gamemaster"))
     async def setDefaultCadre(self, ctx: Context):
         """
         Hiermit kannst du den Standard-Kader des Bots festlegen.
@@ -131,7 +131,7 @@ class Settings(Cog):
         """
         squadDict = await self.getNewCadre(ctx)
 
-        setDefaultCadre(squadDict)
+        await setDefaultCadre(squadDict)
 
         embed = Embed(
             title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
@@ -143,8 +143,8 @@ class Settings(Cog):
         embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
 
-    @command(name="change", aliases=["ändern", "wechseln"])
-    @has_role(getRoleID("gamemaster"))
+    @commands.hybrid_command(name="change", aliases=["ändern", "wechseln"])
+    @has_role(await getRoleID("gamemaster"))
     async def changeCadre(self, ctx: Context, clear: Optional[str] = None):
         """
         Hiermit änderst du den aktuellen Spielekader.
@@ -155,7 +155,7 @@ class Settings(Cog):
         if bool(clear):
             if clear.lower() not in ("y", "j", "yes", "ja", "t", "true", "1", "on"):
                 return
-            setPlayingCadre({})
+            await setPlayingCadre({})
             await ctx.send(
                 "Der bisher ausgewählte Spielekader wurde gelöscht. Wenn gespielt wird, wird der Standardkader benutzt.",
                 delete_after=20.0,
@@ -164,7 +164,7 @@ class Settings(Cog):
 
         squadDict = await self.getNewCadre(ctx)
 
-        setPlayingCadre(squadDict)
+        await setPlayingCadre(squadDict)
 
         embed = Embed(
             title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
@@ -177,24 +177,24 @@ class Settings(Cog):
         await ctx.send(embed=embed, delete_after=60.0)
 
     # last stand with lukas
-    @command(name="fill", aliases=["hinzufügen", "add"])
-    @has_role(getRoleID("gamemaster"))
+    @commands.hybrid_command(name="fill", aliases=["hinzufügen", "add"])
+    @has_role(await getRoleID("gamemaster"))
     async def addCitizen(self, ctx: Context):
         """
         Zu dem aktuellen Spielekader wird ein Dorfbewohner hinzugefügt.
         Wenn es noch keinen Spielekader gibt, dann wird zu dem Standartkader ein Dorfbewohner hinzugefügt.
         Der Standartkader wird dann zum Spielekader.
         """
-        cadre = getCadre()
+        cadre = await getCadre()
         if "dorfbewohner" not in cadre:
             cadre["dorfbewohner"] = 1
         else:
             cadre["dorfbewohner"] += 1
-        setPlayingCadre(cadre)
+        await setPlayingCadre(cadre)
         await self.returnCadre(ctx)
 
-    @command(name="minus", aliases=["entfernen", "sub"])
-    @has_role(getRoleID("gamemaster"))
+    @commands.hybrid_command(name="minus", aliases=["entfernen", "sub"])
+    @has_role(await getRoleID("gamemaster"))
     async def removeCitizen(self, ctx: Context):
         """
         Von dem aktuellen Kader wird ein Dorfbewohner entfernt.
@@ -202,7 +202,7 @@ class Settings(Cog):
         Der Standartkader wird dann zum Spielekader.
         Wenn es keine Dorfbewohner mehr gibt, dann passiert nichts.
         """
-        cadre = getCadre()
+        cadre = await getCadre()
         if "dorfbewohner" in cadre:
             cadre["dorfbewohner"] -= 1
             if cadre["dorfbewohner"] == 0:
@@ -215,15 +215,15 @@ class Settings(Cog):
             await ctx.send(
                 "Es gibt keine Dorfbewohner mehr im aktuellen Kader!", delete_after=20.0
             )
-        setPlayingCadre(cadre)
+        await setPlayingCadre(cadre)
         await self.returnCadre(ctx)
 
-    @command(name="cadre", aliases=["kader"])
+    @commands.hybrid_command(name="cadre", aliases=["kader"])
     async def returnCadre(self, ctx: Context):
         """
         Gibt den aktuellen Kader zurück.
         """
-        cadre = getCadre()
+        cadre = await getCadre()
         embed = Embed(
             title="Der Kader sieht wie folgt aus.", color=Colour.from_rgb(192, 192, 192)
         )
@@ -234,8 +234,8 @@ class Settings(Cog):
         embed.add_field(name=f"{self.cadreLength}er Kader", value=value)
         await ctx.send(embed=embed, delete_after=60.0)
 
-    @command(name="setRole", aliases=["gibRolle", "role"])
-    @has_role(getRoleID("gamemaster"))
+    @commands.hybrid_command(name="set_role", aliases=["gibRolle", "role"])
+    @has_role(await getRoleID("gamemaster"))
     async def setPlayerRole(self, ctx: Context, player: Member, role: MyRoleConverter):
         await player.add_roles(role)
         await ctx.send(
@@ -244,13 +244,13 @@ class Settings(Cog):
                 description=f"Der Spieler {player.display_name} hat folgende Rollen:",
                 color=Colour.random(),
             ).add_field(
-                name="Rollen", value="\n".join(map(lambda x: x.name, player.roles))
+                name="rollen", value="\n".join(map(lambda x: x.name, player.roles))
             ),
             delete_after=100.0,
         )
 
-    @command(name="delete", aliases=["lösche", "del"])
-    @has_role(getRoleID("gamemaster"))
+    @commands.hybrid_command(name="delete", aliases=["lösche", "del"])
+    @has_role(await getRoleID("gamemaster"))
     async def deleteMessages(self, ctx: Context, number: Optional[int] = 1, channel: Optional[TextChannel] = None):
         """
         Löscht die angegebene Anzahl an Nachrichten im angegebenen Kanal.
@@ -267,21 +267,21 @@ class Settings(Cog):
         await ctx.send(
             embed=Embed(
                 title="Gelöschte Nachrichten", colour=Colour.teal()
-            ).add_field(name="Anzahl", value=str(number)),
+            ).add_field(name="anzahl", value=str(number)),
             delete_after=60.0,
         )
 
-    @command(name="clear", aliases=["aufräumen", "leeren"])
-    @has_role(getRoleID("gamemaster"))
+    @commands.hybrid_command(name="clear", aliases=["aufräumen", "leeren"])
+    @has_role(await getRoleID("gamemaster"))
     async def clearGameChannels(self, ctx: Context):
         """
         Die Kanäle, in denen gespielt wird, werden aufgeräumt.
         Alle Nachrichten in den Kanälen unterhalb der Kategorie Morbach werden geleert.
         Ausgenommen sind die Bot-Kanäle
         """
-        game_category = ctx.guild.get_channel(getChannelID("game_category"))
+        game_category = ctx.guild.get_channel(await getChannelID("game_category"))
         bot_channels = tuple(
-            ctx.guild.get_channel(getChannelID(x))
+            ctx.guild.get_channel(await getChannelID(x))
             for x in ("bot_channel", "music_channel")
         )
         numMsgs = 0
@@ -299,7 +299,7 @@ class Settings(Cog):
                     for message in history:
                         await message.delete()
                         numMsgs += 1
-        loveChannel = ctx.guild.get_channel(getChannelID("lovebirds"))
+        loveChannel = ctx.guild.get_channel(await getChannelID("lovebirds"))
         removed_players = []
         for member in filter(
                 lambda player: type(player) == Member and player != ctx.guild.owner,
@@ -312,9 +312,9 @@ class Settings(Cog):
             title="Gelöschte Nachrichten",
             description="Die Kanäle wurden geleert.",
             colour=Colour.teal())
-        embed.add_field(name="Anzahl", value=str(numMsgs))
+        embed.add_field(name="anzahl", value=str(numMsgs))
         if removed_players:
-            embed.add_field(name="Liebespaar", value="\n".join(removed_players))
+            embed.add_field(name="liebespaar", value="\n".join(removed_players))
         await msg.delete()
         await ctx.send(embed=embed, delete_after=100.0)
 
@@ -329,5 +329,5 @@ class Settings(Cog):
             self.bot.cogs_ready.ready_up("settings")
 
 
-def setup(bot):
-    bot.add_cog(Settings(bot))
+async def setup(bot):
+    await bot.add_cog(Settings(bot))
